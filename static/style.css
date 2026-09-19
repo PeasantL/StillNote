@@ -1,17 +1,17 @@
 :root {
   color-scheme: dark;
-  --qn-bg: #020817;
-  --qn-surface: rgba(10, 27, 58, .64);
-  --qn-surface-strong: rgba(10, 26, 58, .82);
-  --qn-surface-soft: rgba(111, 180, 255, .09);
-  --qn-text: #f1f7ff;
-  --qn-muted: #94a9c7;
-  --qn-accent: #68b7ff;
-  --qn-accent-strong: #1684ff;
-  --qn-border: rgba(194, 224, 255, .16);
-  --qn-border-bright: rgba(220, 239, 255, .31);
-  --qn-shadow: rgba(0, 5, 22, .54);
-  --qn-glow: rgba(32, 132, 255, .27);
+  --qn-bg: #000;
+  --qn-surface: rgba(29, 29, 31, .72);
+  --qn-surface-strong: rgba(35, 35, 37, .86);
+  --qn-surface-soft: rgba(255, 255, 255, .06);
+  --qn-text: #f5f5f7;
+  --qn-muted: #a1a1a6;
+  --qn-accent: #b8d7ff;
+  --qn-accent-strong: #5b9fff;
+  --qn-border: rgba(255, 255, 255, .1);
+  --qn-border-bright: rgba(255, 255, 255, .2);
+  --qn-shadow: rgba(0, 0, 0, .72);
+  --qn-glow: rgba(255, 255, 255, .08);
   --bs-primary: #1684ff;
   --bs-primary-rgb: 22, 132, 255;
   --bs-body-bg: var(--qn-bg);
@@ -44,21 +44,14 @@ body {
   color: var(--qn-text);
   overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
-  background:
-    radial-gradient(circle at 14% 16%, rgba(43, 144, 255, .45), transparent 29%),
-    radial-gradient(circle at 86% 8%, rgba(24, 224, 255, .2), transparent 25%),
-    radial-gradient(circle at 62% 88%, rgba(25, 64, 255, .38), transparent 34%),
-    linear-gradient(135deg, #06142f 0%, #02102c 42%, #031a4f 70%, #020817 100%);
+  background: #000;
 }
 body::before {
   content: "";
   position: fixed;
   inset: 0;
   pointer-events: none;
-  background:
-    linear-gradient(118deg, transparent 0 48%, rgba(83, 191, 255, .12) 49%, transparent 52%),
-    linear-gradient(155deg, transparent 0 65%, rgba(22, 88, 255, .17) 66%, transparent 72%);
-  opacity: .9;
+  background: radial-gradient(circle at 50% 0, rgba(255, 255, 255, .035), transparent 48%);
 }
 button, input, textarea { font: inherit; }
 button { -webkit-tap-highlight-color: transparent; }
@@ -69,11 +62,11 @@ button { -webkit-tap-highlight-color: transparent; }
   filter: blur(2px);
   pointer-events: none;
   mix-blend-mode: screen;
-  opacity: .7;
+  opacity: .14;
 }
-.ambient-orb-one { width: 38vw; height: 38vw; left: -15vw; bottom: -22vw; background: radial-gradient(circle at 60% 35%, #0be1ff, #0752ff 42%, transparent 72%); }
-.ambient-orb-two { width: 46vw; height: 18vw; right: -12vw; top: -5vw; transform: rotate(-16deg); background: radial-gradient(ellipse, rgba(38, 235, 255, .6), rgba(22, 86, 255, .3) 45%, transparent 72%); }
-.ambient-orb-three { width: 30vw; height: 30vw; left: 43vw; bottom: -24vw; background: radial-gradient(circle, rgba(36, 87, 255, .58), transparent 68%); }
+.ambient-orb-one { width: 38vw; height: 38vw; left: -15vw; bottom: -22vw; background: radial-gradient(circle at 60% 35%, #fff, #777 42%, transparent 72%); }
+.ambient-orb-two { width: 46vw; height: 18vw; right: -12vw; top: -5vw; transform: rotate(-16deg); background: radial-gradient(ellipse, rgba(255, 255, 255, .65), rgba(120, 120, 120, .25) 45%, transparent 72%); }
+.ambient-orb-three { width: 30vw; height: 30vw; left: 43vw; bottom: -24vw; background: radial-gradient(circle, rgba(255, 255, 255, .34), transparent 68%); }
 
 .app-shell {
   position: relative;
@@ -87,12 +80,12 @@ button { -webkit-tap-highlight-color: transparent; }
   overflow: hidden;
   border: 1px solid var(--qn-border-bright);
   border-radius: 28px;
-  background: rgba(4, 15, 38, .28);
+  background: rgba(8, 8, 9, .58);
   box-shadow:
     0 36px 90px var(--qn-shadow),
-    0 3px 14px rgba(0, 9, 35, .45),
+    0 3px 14px rgba(0, 0, 0, .6),
     inset 0 1px rgba(255, 255, 255, .2),
-    inset 0 -1px rgba(0, 20, 62, .28);
+    inset 0 -1px rgba(0, 0, 0, .38);
   -webkit-backdrop-filter: blur(34px) saturate(145%);
   backdrop-filter: blur(34px) saturate(145%);
 }
@@ -105,8 +98,8 @@ button { -webkit-tap-highlight-color: transparent; }
   flex-direction: column;
   padding: 10px;
   background:
-    linear-gradient(155deg, rgba(156, 211, 255, .12), transparent 32%),
-    var(--qn-surface);
+    linear-gradient(155deg, rgba(255, 255, 255, .08), transparent 32%),
+    rgba(38, 38, 40, .8);
   border-right: 1px solid var(--qn-border);
   box-shadow: inset -1px 0 rgba(0, 14, 49, .18);
   -webkit-backdrop-filter: blur(30px) saturate(155%);
@@ -173,8 +166,8 @@ button { -webkit-tap-highlight-color: transparent; }
   background: rgba(105, 183, 255, .17);
 }
 .icon-button { display: grid; place-items: center; min-width: 37px; height: 37px; padding: 0; border-radius: 12px; }
-.danger-button { color: #ffb6c1; }
-.danger-button:hover { color: #fff; border-color: rgba(255, 139, 159, .55); background: rgba(237, 70, 101, .22); }
+.danger-button { color: var(--qn-text); }
+.danger-button:hover { color: #fff; border-color: rgba(255, 255, 255, .34); background: rgba(255, 255, 255, .1); }
 .editor-toolbar .glass-button { padding: .46rem .82rem; border-radius: 14px; font-weight: 700; letter-spacing: -.01em; }
 .theme-toggle { display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border-radius: 14px; }
 .theme-icon { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
@@ -186,8 +179,8 @@ button { -webkit-tap-highlight-color: transparent; }
   position: relative;
   overflow-y: auto;
   background:
-    linear-gradient(180deg, rgba(105, 181, 255, .08), transparent 25%),
-    rgba(4, 17, 43, .56);
+    linear-gradient(180deg, rgba(255, 255, 255, .045), transparent 25%),
+    rgba(25, 25, 27, .76);
   border-right: 1px solid var(--qn-border);
   scrollbar-width: thin;
   scrollbar-color: rgba(127, 187, 255, .25) transparent;
@@ -195,7 +188,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .browser-header {
   z-index: 2;
   padding: 24px 20px 17px;
-  background: linear-gradient(180deg, rgba(8, 28, 66, .94), rgba(8, 27, 61, .74) 78%, transparent);
+  background: linear-gradient(180deg, rgba(34, 34, 36, .94), rgba(29, 29, 31, .78) 78%, transparent);
   -webkit-backdrop-filter: blur(26px) saturate(150%);
   backdrop-filter: blur(26px) saturate(150%);
 }
@@ -259,8 +252,8 @@ button { -webkit-tap-highlight-color: transparent; }
   position: relative;
   min-width: 0;
   background:
-    radial-gradient(circle at 85% 8%, rgba(32, 188, 255, .09), transparent 24%),
-    linear-gradient(150deg, rgba(13, 38, 83, .72), rgba(3, 14, 38, .69));
+    radial-gradient(circle at 85% 8%, rgba(255, 255, 255, .035), transparent 24%),
+    rgba(13, 13, 15, .82);
   -webkit-backdrop-filter: blur(24px) saturate(140%);
   backdrop-filter: blur(24px) saturate(140%);
 }
@@ -297,7 +290,7 @@ button { -webkit-tap-highlight-color: transparent; }
   min-height: 70px;
   padding: 15px 20px;
   border-bottom: 1px solid var(--qn-border);
-  background: rgba(5, 19, 47, .42);
+  background: rgba(22, 22, 24, .68);
   box-shadow: 0 7px 25px rgba(0, 5, 25, .08);
   -webkit-backdrop-filter: blur(24px) saturate(145%);
   backdrop-filter: blur(24px) saturate(145%);
@@ -307,15 +300,15 @@ button { -webkit-tap-highlight-color: transparent; }
   flex: 1;
   display: flex;
   flex-direction: column;
-  width: min(880px, calc(100% - 32px));
+  width: 100%;
   min-height: 0;
-  margin: 18px auto 24px;
-  padding: clamp(2rem, 5vw, 4.2rem);
+  margin: 0;
+  padding: clamp(2rem, 5vw, 4.2rem) clamp(2rem, 7vw, 7rem);
   overflow: hidden;
-  border: 1px solid rgba(201, 231, 255, .14);
-  border-radius: 25px;
-  background: linear-gradient(145deg, rgba(21, 48, 92, .37), rgba(4, 16, 40, .24));
-  box-shadow: inset 0 1px rgba(255,255,255,.1), 0 22px 60px rgba(0, 4, 20, .16);
+  border: 0;
+  border-radius: 0;
+  background: rgba(12, 12, 14, .2);
+  box-shadow: none;
   -webkit-backdrop-filter: blur(44px) saturate(155%);
   backdrop-filter: blur(44px) saturate(155%);
 }
@@ -347,14 +340,14 @@ button { -webkit-tap-highlight-color: transparent; }
 }
 
 @media (max-width: 767.98px) {
-  body { background: #03122f; }
+  body { background: #000; }
   .app-shell { display: block; width: 100%; height: 100dvh; margin: 0; border: 0; border-radius: 0; }
   .note-browser, .editor-pane { height: 100dvh; }
   body.mobile-editing .note-browser { display: none; }
   body:not(.mobile-editing) .editor-pane { display: none; }
   .browser-header { padding: 22px 16px 15px; }
   .editor-toolbar { min-height: 64px; padding: 12px; overflow-x: auto; }
-  .writing-area { width: calc(100% - 20px); margin: 10px; padding: 1.5rem; border-radius: 20px; }
+  .writing-area { width: 100%; margin: 0; padding: 1.5rem; border-radius: 0; }
   .note-title { font-size: 1.75rem; }
 }
 
