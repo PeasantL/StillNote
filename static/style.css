@@ -247,7 +247,7 @@ button { -webkit-tap-highlight-color: transparent; }
 #notesList { position: relative; padding: 4px 0 18px; }
 .note-row {
   margin: 0;
-  padding: 14px 13px;
+  padding: 10px 14px;
   color: var(--qn-text);
   border: 1px solid transparent !important;
   border-radius: 0 !important;
@@ -261,9 +261,9 @@ button { -webkit-tap-highlight-color: transparent; }
   border-color: rgba(255, 255, 255, .1) transparent !important;
   box-shadow: inset 3px 0 rgba(255, 255, 255, .34);
 }
-.note-row-title { font-weight: 650; letter-spacing: -.012em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.note-row-preview { color: var(--qn-muted); font-size: .84rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.note-row-meta { color: #7793b9; font-size: .7rem; }
+.note-row-title { font-size: .9rem; font-weight: 650; letter-spacing: -.012em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.note-row-preview { color: var(--qn-muted); font-size: .76rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.note-row-meta { color: #7793b9; font-size: .64rem; }
 .empty-state { position: relative; color: var(--qn-muted) !important; }
 
 .editor-pane {

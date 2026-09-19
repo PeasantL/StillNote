@@ -58,7 +58,7 @@ function renderNotes() {
     return `<button class="list-group-item list-group-item-action note-row ${state.selected?.id === note.id ? 'active' : ''}" data-id="${note.id}">
       <div class="d-flex gap-2 align-items-center"><span class="note-row-title flex-grow-1">${note.pinned ? '● ' : ''}${escapeHtml(note.title)}</span><span class="note-row-meta">${displayDate(note.updated_at)}</span></div>
       <div class="note-row-preview mt-1">${escapeHtml(preview)}</div>
-      <div class="note-row-meta mt-1">${escapeHtml(tags.replace(/^ · /, ''))}</div>
+      ${tags ? `<div class="note-row-meta mt-1">${escapeHtml(tags.replace(/^ · /, ''))}</div>` : ''}
     </button>`;
   }).join('');
   el.emptyList.classList.toggle('d-none', state.notes.length > 0);
