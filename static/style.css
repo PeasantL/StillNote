@@ -210,8 +210,7 @@ button { -webkit-tap-highlight-color: transparent; }
   margin: 0;
   padding: 0 18px;
 }
-.section-kicker { color: var(--qn-accent); font-size: .64rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
-.browser-title { margin: 1px 0 0; color: var(--qn-text); font-size: 1.2rem; font-weight: 750; letter-spacing: -.035em; }
+.browser-title { margin: 0; color: var(--qn-text); font-size: 1.2rem; font-weight: 750; letter-spacing: -.035em; }
 .new-note-button {
   display: grid;
   place-items: center;
