@@ -120,7 +120,7 @@ button { -webkit-tap-highlight-color: transparent; }
 }
 .sidebar-top + .nav-pills {
   display: grid;
-  width: max-content;
+  width: 100%;
   margin-top: 12px;
 }
 .sidebar-top + .nav-pills .nav-link {
