@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en" data-bs-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>StillNote</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar border-end">
+      <div class="p-3 d-flex align-items-center justify-content-between">
+        <a class="brand text-decoration-none" href="#">StillNote</a>
+        <button class="btn btn-sm btn-outline-secondary d-lg-none" id="closeSidebar" aria-label="Close navigation">×</button>
+      </div>
+      <nav class="nav nav-pills flex-column px-2 gap-1" aria-label="Notes navigation">
+        <button class="nav-link active text-start" data-view="notes">All notes</button>
+        <button class="nav-link text-start" data-view="pinned">Pinned</button>
+        <button class="nav-link text-start" data-view="archived">Archived</button>
+      </nav>
+      <div class="sidebar-heading px-3 mt-4 mb-2">Tags</div>
+      <nav id="tagList" class="nav nav-pills flex-column px-2 gap-1"></nav>
+      <div class="mt-auto p-3 d-grid gap-2">
+        <button class="btn btn-outline-secondary btn-sm" id="themeButton">Use dark theme</button>
+        <a class="btn btn-outline-secondary btn-sm" href="/export/notes.zip">Export notes</a>
+      </div>
+    </aside>
+
+    <section class="note-browser border-end">
+      <header class="p-3 border-bottom sticky-top browser-header">
+        <div class="d-flex gap-2 mb-3">
+          <button class="btn btn-outline-secondary d-lg-none" id="openSidebar" aria-label="Open navigation">☰</button>
+          <button class="btn btn-primary flex-grow-1" id="newNote">New note</button>
+        </div>
+        <label class="visually-hidden" for="search">Search notes</label>
+        <input class="form-control" id="search" type="search" placeholder="Search notes…" autocomplete="off">
+      </header>
+      <div id="notesList" class="list-group list-group-flush" aria-live="polite"></div>
+      <div id="emptyList" class="empty-state p-4 text-center text-secondary d-none">No notes here yet.</div>
+    </section>
+
+    <main class="editor-pane">
+      <div id="emptyEditor" class="empty-editor text-secondary">
+        <div>
+          <h1 class="h4">Choose a note</h1>
+          <p>Or create a new one to start writing.</p>
+        </div>
+      </div>
+      <div id="editor" class="editor d-none">
+        <header class="editor-toolbar border-bottom p-3 d-flex align-items-center gap-2">
+          <button class="btn btn-outline-secondary d-md-none" id="backToList" aria-label="Back to notes">←</button>
+          <span id="saveStatus" class="small text-secondary me-auto">Saved</span>
+          <button class="btn btn-outline-secondary btn-sm" id="pinNote">Pin</button>
+          <button class="btn btn-outline-secondary btn-sm" id="archiveNote">Archive</button>
+          <button class="btn btn-outline-danger btn-sm" id="deleteNote">Delete</button>
+        </header>
+        <div class="writing-area">
+          <label class="visually-hidden" for="noteTitle">Note title</label>
+          <input id="noteTitle" class="note-title" maxlength="200" placeholder="Untitled note">
+          <label class="visually-hidden" for="noteTags">Tags</label>
+          <input id="noteTags" class="form-control form-control-sm border-0 px-0 tag-input" placeholder="Tags, separated by commas">
+          <label class="visually-hidden" for="noteContent">Note content</label>
+          <textarea id="noteContent" class="note-content" placeholder="Start writing…"></textarea>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div class="sidebar-scrim" id="sidebarScrim"></div>
+  <div class="toast-container position-fixed bottom-0 end-0 p-3">
+    <div id="messageToast" class="toast" role="status" aria-live="polite">
+      <div class="toast-body" id="messageText"></div>
+    </div>
+  </div>
+  <script src="{{ url_for('static', filename='vendor/bootstrap.bundle.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
