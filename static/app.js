@@ -1,4 +1,5 @@
 const state = { notes: [], selected: null, view: 'notes', tag: '', search: '', saveTimer: null, listTimer: null };
+const LAST_NOTE_KEY = 'stillnote-last-note';
 const el = Object.fromEntries([
   'notesList', 'emptyList', 'emptyEditor', 'editor', 'noteTitle', 'noteTags', 'noteContent',
   'saveStatus', 'pinNote', 'archiveNote', 'deleteNote', 'newNote', 'search', 'tagList',
@@ -66,6 +67,7 @@ function renderNotes() {
 
 function showEditor(note) {
   state.selected = note;
+  localStorage.setItem(LAST_NOTE_KEY, String(note.id));
   el.noteTitle.value = note.title;
   el.noteContent.value = note.content;
   el.noteTags.value = note.tags.join(', ');
@@ -80,6 +82,13 @@ function showEditor(note) {
 async function selectNote(id) {
   try { showEditor(await api(`/api/notes/${id}`)); }
   catch (error) { showMessage(error.message); }
+}
+
+function restoreLastOpenedNote() {
+  const savedId = Number(localStorage.getItem(LAST_NOTE_KEY));
+  const note = state.notes.find(candidate => candidate.id === savedId) || state.notes[0];
+  if (note) showEditor(note);
+  else localStorage.removeItem(LAST_NOTE_KEY);
 }
 
 async function createNote() {
@@ -207,4 +216,6 @@ document.addEventListener('keydown', event => {
 
 const savedTheme = localStorage.getItem('stillnote-theme-v2');
 applyTheme(savedTheme || 'dark');
-Promise.all([loadNotes(), loadTags()]).catch(error => showMessage(error.message));
+Promise.all([loadNotes(), loadTags()])
+  .then(restoreLastOpenedNote)
+  .catch(error => showMessage(error.message));
