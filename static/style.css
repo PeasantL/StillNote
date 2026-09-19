@@ -233,6 +233,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .search-shell .form-control {
   height: 42px;
   padding-left: 38px;
+  font-size: .9rem;
   color: var(--qn-text);
   border: 1px solid var(--qn-border);
   border-radius: 13px;
