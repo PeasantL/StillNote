@@ -76,7 +76,7 @@ button { -webkit-tap-highlight-color: transparent; }
   grid-template-columns: 150px 300px minmax(0, 1fr);
   width: calc(100% - 36px);
   height: calc(100vh - 36px);
-  max-width: 1480px;
+  max-width: 1275px;
   margin: 18px auto;
   overflow: hidden;
   border: 1px solid var(--qn-border-bright);
