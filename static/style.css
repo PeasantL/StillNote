@@ -319,7 +319,7 @@ button { -webkit-tap-highlight-color: transparent; }
   width: 100%;
   min-height: 0;
   margin: 0;
-  padding: clamp(2rem, 5vw, 4.2rem) clamp(2rem, 7vw, 7rem);
+  padding: clamp(1.5rem, 3vw, 3rem) clamp(1.5rem, 4vw, 4.5rem);
   overflow: hidden;
   border: 0;
   border-radius: 0;
@@ -329,9 +329,9 @@ button { -webkit-tap-highlight-color: transparent; }
   backdrop-filter: blur(44px) saturate(155%);
 }
 .note-title, .note-content { width: 100%; color: var(--qn-text); border: 0; outline: 0; background: transparent; }
-.note-title { margin-bottom: .65rem; font-size: clamp(1.7rem, 3vw, 2.35rem); font-weight: 750; letter-spacing: -.045em; line-height: 1.15; }
+.note-title { margin-bottom: .45rem; font-size: clamp(1.7rem, 3vw, 2.35rem); font-weight: 750; letter-spacing: -.045em; line-height: 1.15; }
 .note-title::placeholder, .note-content::placeholder { color: color-mix(in srgb, var(--qn-muted) 76%, transparent); }
-.tag-input { margin-bottom: 1.4rem; padding-bottom: 15px !important; color: var(--qn-accent); border-bottom: 1px solid var(--qn-border) !important; border-radius: 0; background: transparent; box-shadow: none !important; }
+.tag-input { margin-bottom: 1rem; padding-bottom: 11px !important; color: var(--qn-accent); border-bottom: 1px solid var(--qn-border) !important; border-radius: 0; background: transparent; box-shadow: none !important; }
 .tag-input::placeholder { color: var(--qn-muted); }
 .note-content { flex: 1; min-height: 240px; resize: none; font-family: ui-serif, Georgia, "Times New Roman", serif; font-size: 1.05rem; line-height: 1.8; scrollbar-width: thin; scrollbar-color: rgba(113, 180, 255, .23) transparent; }
 .sidebar-scrim { display: none; }
@@ -364,7 +364,7 @@ button { -webkit-tap-highlight-color: transparent; }
   .browser-header { padding: 0; }
   .browser-title-row { padding: 0 16px; }
   .editor-toolbar { min-height: 64px; padding: 12px; overflow-x: auto; }
-  .writing-area { width: 100%; margin: 0; padding: 1.5rem; border-radius: 0; }
+  .writing-area { width: 100%; margin: 0; padding: 1.25rem; border-radius: 0; }
   .note-title { font-size: 1.75rem; }
 }
 
