@@ -157,8 +157,11 @@ function closeSidebar() { document.body.classList.remove('sidebar-open'); }
 
 function applyTheme(theme) {
   document.documentElement.dataset.bsTheme = theme;
-  localStorage.setItem('stillnote-theme', theme);
-  el.themeButton.textContent = theme === 'dark' ? 'Use light theme' : 'Use dark theme';
+  localStorage.setItem('stillnote-theme-v2', theme);
+  const nextTheme = theme === 'dark' ? 'light' : 'dark';
+  const label = `Use ${nextTheme} theme`;
+  el.themeButton.setAttribute('aria-label', label);
+  el.themeButton.title = label;
 }
 
 el.notesList.addEventListener('click', event => {
@@ -202,6 +205,6 @@ document.addEventListener('keydown', event => {
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); el.search.focus(); }
 });
 
-const savedTheme = localStorage.getItem('stillnote-theme');
-applyTheme(savedTheme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+const savedTheme = localStorage.getItem('stillnote-theme-v2');
+applyTheme(savedTheme || 'dark');
 Promise.all([loadNotes(), loadTags()]).catch(error => showMessage(error.message));

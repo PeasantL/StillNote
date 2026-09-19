@@ -10,6 +10,10 @@ docker compose up --build -d
 
 Open <http://localhost:8080>. Stop it with `docker compose down`. Notes are kept in the `notes-data` Docker volume.
 
+Set `PORT` in `.env` to use a different host port while keeping the app
+loopback-only. For example, `PORT=1000` serves it at
+<http://localhost:1000>.
+
 ## Run for development
 
 ```sh
