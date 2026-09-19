@@ -23,9 +23,18 @@
         <button class="btn icon-button d-lg-none" id="closeSidebar" aria-label="Close navigation">×</button>
       </div>
       <nav class="nav nav-pills flex-column px-2 gap-1" aria-label="Notes navigation">
-        <button class="nav-link active text-start" data-view="notes"><span class="nav-icon">▤</span>All notes</button>
-        <button class="nav-link text-start" data-view="pinned"><span class="nav-icon">◆</span>Pinned</button>
-        <button class="nav-link text-start" data-view="archived"><span class="nav-icon">⌁</span>Archived</button>
+        <button class="nav-link active text-start" data-view="notes">
+          <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h12v17H6z"/><path d="M9 8h6M9 12h6M9 16h4"/></svg></span>
+          All notes
+        </button>
+        <button class="nav-link text-start" data-view="pinned">
+          <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6l-.75 6 3.25 3v2h-11v-2l3.25-3z"/><path d="M12 14v7"/></svg></span>
+          Pinned
+        </button>
+        <button class="nav-link text-start" data-view="archived">
+          <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h8l4 4v13H6z"/><path d="M14 3.5v4h4M9 12h6M9 16h6"/></svg></span>
+          Archived
+        </button>
       </nav>
       <div class="sidebar-heading px-3 mt-4 mb-2">Tags</div>
       <nav id="tagList" class="nav nav-pills flex-column px-2 gap-1"></nav>
