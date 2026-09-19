@@ -143,11 +143,22 @@ async function patchSelected(changes) {
 async function deleteSelected() {
   if (!state.selected || !confirm(`Permanently delete “${state.selected.title}”?`)) return;
   try {
+    clearTimeout(state.saveTimer);
     await api(`/api/notes/${state.selected.id}`, { method: 'DELETE' });
     state.selected = null;
-    el.editor.classList.add('d-none'); el.emptyEditor.classList.remove('d-none');
-    document.body.classList.remove('mobile-editing');
+    localStorage.removeItem(LAST_NOTE_KEY);
+    state.view = 'notes'; state.tag = ''; state.search = ''; el.search.value = '';
+    setActiveView();
     await Promise.all([loadNotes(), loadTags()]);
+    const newestNote = state.notes.reduce((newest, note) => (
+      !newest || note.created_at > newest.created_at ? note : newest
+    ), null);
+    if (newestNote) showEditor(newestNote);
+    else {
+      el.editor.classList.add('d-none');
+      el.emptyEditor.classList.add('d-none');
+      document.body.classList.remove('mobile-editing');
+    }
   } catch (error) { showMessage(error.message); }
 }
 
