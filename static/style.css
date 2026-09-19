@@ -118,11 +118,7 @@ button { -webkit-tap-highlight-color: transparent; }
   margin: 0 -10px;
   padding: 0 20px;
 }
-.sidebar-top + .nav-pills {
-  margin-top: 12px;
-  margin-right: -10px;
-  padding-right: 0 !important;
-}
+.sidebar-top + .nav-pills { margin-top: 12px; }
 .brand { display: inline-flex; align-items: center; gap: 10px; color: var(--qn-text); font-size: 1.05rem; font-weight: 700; letter-spacing: -.025em; }
 .brand:hover { color: var(--qn-text); }
 .brand-mark {
