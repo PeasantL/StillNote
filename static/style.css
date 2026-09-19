@@ -183,7 +183,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .icon-button { display: grid; place-items: center; min-width: 37px; height: 37px; padding: 0; border-radius: 12px; }
 .danger-button { color: var(--qn-text); }
 .danger-button:hover { color: #fff; border-color: rgba(255, 255, 255, .34); background: rgba(255, 255, 255, .1); }
-.editor-toolbar .glass-button { padding: .46rem .82rem; border-radius: 14px; font-weight: 700; letter-spacing: -.01em; }
+.editor-toolbar .glass-button { padding: .32rem .65rem; border-radius: 12px; font-size: .8rem; font-weight: 700; letter-spacing: -.01em; }
 .theme-toggle { display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border-radius: 14px; }
 .theme-icon { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .theme-icon-moon { display: none; }
@@ -219,11 +219,11 @@ button { -webkit-tap-highlight-color: transparent; }
 .new-note-button {
   display: grid;
   place-items: center;
-  width: 38px;
-  height: 38px;
+  width: 34px;
+  height: 34px;
   padding: 0;
-  border-radius: 14px;
-  font-size: 1.3rem;
+  border-radius: 12px;
+  font-size: 1.15rem;
   line-height: 1;
 }
 .new-note-button:hover { transform: translateY(-1px); }
