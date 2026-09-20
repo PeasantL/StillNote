@@ -264,6 +264,13 @@ document.addEventListener('keydown', event => {
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); el.search.focus(); }
 });
 
+for (const eventName of ['gesturestart', 'gesturechange', 'gestureend']) {
+  document.addEventListener(eventName, event => event.preventDefault(), { passive: false });
+}
+document.addEventListener('touchmove', event => {
+  if (event.scale !== undefined && event.scale !== 1) event.preventDefault();
+}, { passive: false });
+document.addEventListener('wheel', event => { if (event.ctrlKey) event.preventDefault(); }, { passive: false });
 const savedTheme = localStorage.getItem('stillnote-theme-v2');
 const startupStarted = performance.now();
 
