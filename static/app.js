@@ -3,7 +3,7 @@ const LAST_NOTE_KEY = 'stillnote-last-note';
 const el = Object.fromEntries([
   'notesList', 'emptyList', 'emptyEditor', 'editor', 'noteTitle', 'noteTags', 'noteContent',
   'saveStatus', 'pinNote', 'archiveNote', 'deleteNote', 'newNote', 'search', 'tagList',
-  'themeButton', 'openSidebar', 'closeSidebar', 'sidebarScrim', 'backToList', 'messageToast', 'messageText'
+  'tagChips', 'editTags', 'tagEditor', 'doneTags', 'emptyNewNote', 'emptyEditorTitle', 'emptyEditorDescription', 'themeButton', 'openSidebar', 'closeSidebar', 'sidebarScrim', 'backToList', 'messageToast', 'messageText'
 ].map(id => [id, document.getElementById(id)]));
 
 async function api(url, options = {}) {
@@ -57,12 +57,38 @@ function renderNotes() {
     const preview = note.content.replace(/\s+/g, ' ').trim() || 'Empty note';
     const tags = note.tags.length ? ` · ${note.tags.join(', ')}` : '';
     return `<button class="list-group-item list-group-item-action note-row ${state.selected?.id === note.id ? 'active' : ''}" data-id="${note.id}">
-      <div class="d-flex gap-2 align-items-center"><span class="note-row-title flex-grow-1">${note.pinned ? '● ' : ''}${escapeHtml(note.title)}</span><span class="note-row-meta">${displayDate(note.updated_at)}</span></div>
+      <div class="d-flex gap-2 align-items-center"><span class="note-row-title flex-grow-1">${note.pinned ? '<svg class="pinned-icon" viewBox="0 0 24 24" role="img" aria-label="Pinned"><path d="M9 3h6l-.75 6 3.25 3v2h-11v-2l3.25-3zM12 14v7"/></svg>' : ''}${escapeHtml(note.title)}</span><span class="note-row-meta">${displayDate(note.updated_at)}</span></div>
       <div class="note-row-preview mt-1">${escapeHtml(preview)}</div>
       ${tags ? `<div class="note-row-meta mt-1">${escapeHtml(tags.replace(/^ · /, ''))}</div>` : ''}
     </button>`;
   }).join('');
   el.emptyList.classList.toggle('d-none', state.notes.length > 0);
+  el.emptyList.textContent = state.search ? 'No matching notes.' : state.view === 'pinned' ? 'No pinned notes yet.' : state.view === 'archived' ? 'No archived notes.' : 'No notes here yet.';
+}
+
+function renderTagChips() {
+  const tags = [...new Set(el.noteTags.value.split(',').map(tag => tag.trim()).filter(Boolean))];
+  el.tagChips.replaceChildren(...tags.map(tag => {
+    const chip = document.createElement('span');
+    chip.className = 'tag-chip';
+    chip.textContent = tag;
+    return chip;
+  }));
+  el.editTags.textContent = tags.length ? 'Edit tags' : 'Add tags';
+}
+
+function closeTagEditor() {
+  el.tagEditor.classList.add('d-none');
+  el.editTags.setAttribute('aria-expanded', 'false');
+  renderTagChips();
+}
+
+function showEmptyEditor() {
+  el.editor.classList.add('d-none');
+  el.emptyEditor.classList.remove('d-none');
+  el.emptyEditorTitle.textContent = state.notes.length ? 'Choose a note' : 'A little space to think';
+  el.emptyEditorDescription.textContent = state.notes.length ? 'Open a note from your library, or start a fresh page.' : 'Capture an idea, make a list, or start a fresh page.';
+  document.body.classList.remove('mobile-editing');
 }
 
 function showEditor(note) {
@@ -71,6 +97,8 @@ function showEditor(note) {
   el.noteTitle.value = note.title;
   el.noteContent.value = note.content;
   el.noteTags.value = note.tags.join(', ');
+  closeTagEditor();
+  el.pinNote.setAttribute('aria-pressed', String(note.pinned));
   el.pinNote.textContent = note.pinned ? 'Unpin' : 'Pin';
   el.archiveNote.textContent = note.archived ? 'Restore' : 'Archive';
   el.emptyEditor.classList.add('d-none');
@@ -88,7 +116,7 @@ function restoreLastOpenedNote() {
   const savedId = Number(localStorage.getItem(LAST_NOTE_KEY));
   const note = state.notes.find(candidate => candidate.id === savedId) || state.notes[0];
   if (note) showEditor(note);
-  else localStorage.removeItem(LAST_NOTE_KEY);
+  else { localStorage.removeItem(LAST_NOTE_KEY); showEmptyEditor(); }
 }
 
 async function createNote() {
@@ -155,9 +183,7 @@ async function deleteSelected() {
     ), null);
     if (newestNote) showEditor(newestNote);
     else {
-      el.editor.classList.add('d-none');
-      el.emptyEditor.classList.add('d-none');
-      document.body.classList.remove('mobile-editing');
+      showEmptyEditor();
     }
   } catch (error) { showMessage(error.message); }
 }
@@ -189,9 +215,22 @@ el.notesList.addEventListener('click', event => {
   if (row) selectNote(Number(row.dataset.id));
 });
 el.newNote.addEventListener('click', createNote);
+el.emptyNewNote.addEventListener('click', createNote);
+el.editTags.addEventListener('click', () => {
+  const opening = el.tagEditor.classList.contains('d-none');
+  el.tagEditor.classList.toggle('d-none', !opening);
+  el.editTags.setAttribute('aria-expanded', String(opening));
+  if (opening) el.noteTags.focus();
+});
+el.doneTags.addEventListener('click', () => { closeTagEditor(); el.editTags.focus(); });
+el.noteTags.addEventListener('keydown', event => {
+  if (event.key === 'Enter' || event.key === 'Escape') {
+    event.preventDefault(); closeTagEditor(); el.editTags.focus();
+  }
+});
 el.noteTitle.addEventListener('input', scheduleSave);
 el.noteContent.addEventListener('input', scheduleSave);
-el.noteTags.addEventListener('input', scheduleSave);
+el.noteTags.addEventListener('input', () => { renderTagChips(); scheduleSave(); });
 el.pinNote.addEventListener('click', () => patchSelected({ pinned: !state.selected.pinned }));
 el.archiveNote.addEventListener('click', async () => {
   await patchSelected({ archived: !state.selected.archived });
@@ -226,7 +265,23 @@ document.addEventListener('keydown', event => {
 });
 
 const savedTheme = localStorage.getItem('stillnote-theme-v2');
+const startupStarted = performance.now();
+
+function revealApp() {
+  const delay = Math.max(0, 300 - (performance.now() - startupStarted));
+  setTimeout(() => requestAnimationFrame(() => {
+    document.documentElement.classList.remove('sn-loading');
+    document.documentElement.classList.add('sn-ready');
+    document.querySelector('.app-shell')?.setAttribute('aria-busy', 'false');
+  }), delay);
+}
+
+window.addEventListener('pageshow', event => {
+  if (event.persisted) revealApp();
+});
+
 applyTheme(savedTheme || 'dark');
 Promise.all([loadNotes(), loadTags()])
   .then(restoreLastOpenedNote)
-  .catch(error => showMessage(error.message));
+  .catch(error => showMessage(error.message))
+  .finally(revealApp);
