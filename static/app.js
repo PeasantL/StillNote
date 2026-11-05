@@ -6,6 +6,36 @@ const el = Object.fromEntries([
   'tagChips', 'editTags', 'tagEditor', 'doneTags', 'emptyNewNote', 'emptyEditorTitle', 'emptyEditorDescription', 'themeButton', 'openSidebar', 'closeSidebar', 'sidebarScrim', 'backToList', 'messageToast', 'messageText'
 ].map(id => [id, document.getElementById(id)]));
 
+// Safari's keyboard can resize and pan the visual viewport while leaving vh/dvh
+// and the layout viewport unchanged, including in Home Screen web apps.
+function trackViewport() {
+  const root = document.documentElement;
+  const viewport = window.visualViewport;
+  let frame;
+
+  function update() {
+    frame = null;
+    // Keep the layout stable during pinch zoom; the browser handles panning it.
+    if (viewport && Math.abs(viewport.scale - 1) > 0.01) return;
+    const height = viewport ? viewport.height : window.innerHeight;
+    root.style.setProperty('--sn-viewport-height', `${height}px`);
+    root.style.setProperty('--sn-viewport-top', `${viewport ? viewport.offsetTop : 0}px`);
+    root.classList.toggle('sn-compact-viewport', height < 600);
+  }
+
+  function scheduleUpdate() {
+    if (frame == null) frame = requestAnimationFrame(update);
+  }
+
+  viewport?.addEventListener('resize', scheduleUpdate);
+  viewport?.addEventListener('scroll', scheduleUpdate);
+  window.addEventListener('resize', scheduleUpdate);
+  window.addEventListener('pageshow', scheduleUpdate);
+  update();
+}
+
+trackViewport();
+
 async function api(url, options = {}) {
   const response = await fetch(url, {
     ...options,
