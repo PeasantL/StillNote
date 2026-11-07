@@ -1,0 +1,8 @@
+[Unit]
+Description=Back up StillNote outside its notes volume
+
+[Service]
+Type=oneshot
+Environment=STILLNOTE_BACKUP_DIR=%h/Backups/StillNote
+ExecStart=%h/StillNote/scripts/backup.sh
+UMask=0077
