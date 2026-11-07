@@ -1,4 +1,4 @@
-const state = { notes: [], selected: null, view: 'notes', tag: '', search: '', saveTimer: null, listTimer: null, dirty: false, editVersion: 0, saving: null, navigating: false, listRequest: 0, conflict: false };
+const state = { notes: [], selected: null, view: 'notes', tag: '', search: '', saveTimer: null, listTimer: null, dirty: false, editVersion: 0, saving: null, navigating: false, listRequest: 0, conflict: false, sort: 'updated', total: 0 };
 const storage = {
   get(key) { try { return localStorage.getItem(key); } catch (_) { return null; } },
   set(key, value) { try { localStorage.setItem(key, value); return true; } catch (_) { return false; } },
@@ -76,25 +76,31 @@ function displayDate(value) {
     : date.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
-async function loadNotes() {
+async function loadNotes({ append = false } = {}) {
   const requestId = ++state.listRequest;
-  const parameters = new URLSearchParams({ summary: '1' });
+  const parameters = new URLSearchParams({ summary: '1', limit: '100', offset: String(append ? state.notes.length : 0), sort: state.sort });
+  if (state.view === 'pinned') parameters.set('pinned', '1');
   if (state.view === 'trash') parameters.set('trash', '1');
   if (state.view === 'archived') parameters.set('archived', '1');
   if (state.search) parameters.set('q', state.search);
   if (state.tag) parameters.set('tag', state.tag);
-  const notes = await api(`/api/notes?${parameters}`);
+  const response = await fetch(`/api/notes?${parameters}`);
+  if (!response.ok) throw new Error('Could not load notes. Please try again.');
+  const notes = await response.json();
   if (requestId !== state.listRequest) return;
-  state.notes = state.view === 'pinned' ? notes.filter(note => note.pinned) : notes;
+  state.total = Number(response.headers.get('X-Total-Count')) || notes.length;
+  state.notes = append ? [...state.notes, ...notes.filter(note => !state.notes.some(existing => existing.id === note.id))] : notes;
   renderNotes();
 
 }
 
 function renderNotes() {
+  document.getElementById('resultCount').textContent = `${state.total} ${state.total === 1 ? 'note' : 'notes'}`;
+  document.getElementById('loadMore').classList.toggle('d-none', state.notes.length >= state.total);
   el.notesList.innerHTML = state.notes.map(note => {
     const preview = (note.preview ?? note.content ?? '').replace(/\s+/g, ' ').trim() || 'Empty note';
     const tags = note.tags.length ? ` · ${note.tags.join(', ')}` : '';
-    return `<button class="list-group-item list-group-item-action note-row ${state.selected?.id === note.id ? 'active' : ''}" data-id="${note.id}">
+    return `<button class="list-group-item list-group-item-action note-row ${state.selected?.id === note.id ? 'active' : ''}" data-id="${note.id}" aria-current="${state.selected?.id === note.id ? 'true' : 'false'}">
       <div class="d-flex gap-2 align-items-center"><span class="note-row-title flex-grow-1">${note.pinned ? '<svg class="pinned-icon" viewBox="0 0 24 24" role="img" aria-label="Pinned"><path d="M9 3h6l-.75 6 3.25 3v2h-11v-2l3.25-3zM12 14v7"/></svg>' : ''}${escapeHtml(note.title)}</span><span class="note-row-meta">${displayDate(note.updated_at)}</span></div>
       <div class="note-row-preview mt-1">${escapeHtml(preview)}</div>
       ${tags ? `<div class="note-row-meta mt-1">${escapeHtml(tags.replace(/^ · /, ''))}</div>` : ''}
@@ -203,6 +209,9 @@ async function selectNote(id) {
 
 async function restoreLastOpenedNote() {
   const savedId = Number(storage.get(LAST_NOTE_KEY));
+  if (savedId && !state.notes.some(candidate => candidate.id === savedId)) {
+    try { showEditor(await api(`/api/notes/${savedId}`)); return; } catch (_) {}
+  }
   const note = state.notes.find(candidate => candidate.id === savedId) || state.notes[0];
   if (note) await selectNote(note.id);
   else { storage.remove(LAST_NOTE_KEY); showEmptyEditor(); }
@@ -230,20 +239,27 @@ function scheduleSave() {
   state.saveTimer = setTimeout(saveNote, 650);
 }
 
-function updateListNote(note) {
-  // Invalidate older responses which could put stale summaries back in the list.
-  state.listRequest++;
-  const matches = (state.view === 'trash' ? !!note.deleted_at : !note.deleted_at && note.archived === (state.view === 'archived'))
+function noteMatchesView(note) {
+return (state.view === 'trash' ? !!note.deleted_at : !note.deleted_at && note.archived === (state.view === 'archived'))
     && (state.view !== 'pinned' || note.pinned)
     && (!state.tag || note.tags.some(tag => tag.toLowerCase() === state.tag.toLowerCase()))
     && (!state.search || `${note.title} ${note.content}`.toLowerCase().includes(state.search.toLowerCase()));
+}
+
+function updateListNote(note, previous = null) {
+  // Invalidate older responses which could put stale summaries back in the list.
+  state.listRequest++;
+  const matches = noteMatchesView(note);
+  const previouslyMatched = previous ? noteMatchesView(previous) : matches;
   state.notes = state.notes.filter(candidate => candidate.id !== note.id);
+  if (matches && !previouslyMatched) state.total++;
+  if (!matches && previouslyMatched) state.total = Math.max(0, state.total - 1);
   if (matches) {
     const { content, ...summary } = note;
     state.notes.push({ ...summary, preview: content.slice(0, 240) });
   }
   state.notes.sort((a, b) => Number(b.pinned) - Number(a.pinned)
-    || b.updated_at.localeCompare(a.updated_at) || b.id - a.id);
+    || (state.sort === 'title' ? a.title.localeCompare(b.title, 'en', { sensitivity: 'base' }) : (state.sort === 'created' ? b.created_at.localeCompare(a.created_at) : b.updated_at.localeCompare(a.updated_at))) || b.id - a.id);
   renderNotes();
 }
 
@@ -258,6 +274,7 @@ async function saveNote() {
         const id = state.selected.id;
         const version = state.editVersion;
         const snapshot = fields();
+        const previous = state.selected;
         const previousTags = state.selected.tags.join(', ');
         el.saveStatus.textContent = 'Saving…';
         const updated = await api(`/api/notes/${id}`, {
@@ -268,7 +285,7 @@ async function saveNote() {
         state.dirty = state.editVersion !== version;
         if (state.dirty) keepDraft();
         else storage.remove(DRAFT_PREFIX + id);
-        updateListNote(updated);
+        updateListNote(updated, previous);
         if (previousTags !== updated.tags.join(', ')) await loadTags();
       }
       el.saveStatus.textContent = 'Saved';
@@ -289,11 +306,12 @@ async function patchSelected(changes) {
   let success = false;
   await navigate(async () => {
     if (!state.selected) return;
+    const previous = state.selected;
     const updated = await api(`/api/notes/${state.selected.id}`, {
       method: 'PATCH', body: JSON.stringify({ ...changes, revision: state.selected.revision })
     });
     showEditor(updated);
-    updateListNote(updated);
+    updateListNote(updated, previous);
     await loadTags();
     if ('pinned' in changes) usage.record('pin');
     if ('archived' in changes) usage.record('archive');
@@ -325,6 +343,7 @@ async function changeTrash(action) {
 async function loadTags() {
   try {
     const tags = await api('/api/tags');
+    document.getElementById('tagSuggestions').replaceChildren(...tags.map(tag => new Option(tag.name, tag.name)));
     el.tagList.replaceChildren(...tags.map(tag => {
       const button = document.createElement('button');
       button.className = `nav-link text-start ${state.tag.toLowerCase() === tag.name.toLowerCase() ? 'active' : ''}`;
@@ -466,6 +485,8 @@ window.addEventListener('pageshow', event => {
   if (event.persisted) revealApp();
 });
 
+const storedSort = storage.get('stillnote-sort');
+if (['updated', 'created', 'title'].includes(storedSort)) { state.sort = storedSort; document.getElementById('sortNotes').value = storedSort; }
 applyTheme(savedTheme || 'dark');
 Promise.all([loadNotes(), loadTags()])
   .then(restoreLastOpenedNote)
@@ -543,3 +564,29 @@ importFile.addEventListener('change', async () => {
     showMessage(`Imported ${result.imported} notes as new copies.`);
   });
 });
+
+const sortNotes = document.getElementById('sortNotes');
+
+sortNotes.addEventListener('change', () => {
+  state.sort = sortNotes.value; storage.set('stillnote-sort', state.sort);
+  loadNotes().catch(error => showMessage(error.message));
+});
+document.getElementById('loadMore').addEventListener('click', async event => {
+  event.target.disabled = true;
+  try { await loadNotes({ append: true }); } catch (error) { showMessage(error.message); }
+  finally { event.target.disabled = false; }
+});
+document.getElementById('clearFilters').addEventListener('click', () => navigate(async () => {
+  clearTimeout(state.listTimer); state.search = ''; state.tag = ''; el.search.value = '';
+  setActiveView(); await Promise.all([loadNotes(), loadTags()]);
+}));
+document.getElementById('renameTag').addEventListener('click', () => navigate(async () => {
+  const source = prompt('Tag to rename or merge:', state.tag);
+  if (!source) return;
+  const target = prompt('New tag name (an existing name merges the tags):', source);
+  if (!target || target === source) return;
+  await api('/api/tags/rename', { method: 'POST', body: JSON.stringify({ from: source, to: target }) });
+  if (state.tag.toLowerCase() === source.toLowerCase()) state.tag = target;
+  if (state.selected) showEditor(await api(`/api/notes/${state.selected.id}${state.selected.deleted_at ? '?trash=1' : ''}`));
+  setActiveView(); await Promise.all([loadNotes(), loadTags()]);
+}));

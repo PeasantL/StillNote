@@ -235,3 +235,22 @@ def test_json_import_from_file(editor):
     page.locator('#importFile').set_input_files({'name': 'backup.json', 'mimeType': 'application/json', 'buffer': json.dumps(backup).encode()})
     page.wait_for_function('state.notes.length === 4')
     assert len(client.get('/api/notes').get_json()) == 4
+
+
+def test_library_pagination_sort_and_filter_reset(editor):
+    page, client, _, _ = editor
+    for index in range(105):
+        client.post('/api/notes', json={'title': f'Batch {index:03}'})
+    page.reload()
+    page.wait_for_selector('.sn-ready')
+    page.wait_for_function('state.notes.length === 100')
+    assert page.locator('#resultCount').text_content() == '107 notes'
+    page.locator('#loadMore').click()
+    page.wait_for_function('state.notes.length === 107')
+    page.locator('#sortNotes').select_option('title')
+    page.wait_for_function("state.notes.length === 100 && state.notes[0].title === 'Batch 000'")
+    page.locator('#search').fill('Batch 099')
+    page.wait_for_function('state.notes.length === 1')
+    page.locator('#clearFilters').click()
+    page.wait_for_function('state.notes.length === 100')
+    assert page.locator('#search').input_value() == ''

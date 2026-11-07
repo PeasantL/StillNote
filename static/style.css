@@ -558,3 +558,7 @@ button:focus-visible, input:not(.note-title):not(.tag-input):focus-visible, a:fo
 dialog { width: min(520px, calc(100vw - 32px)); max-height: 85vh; overflow-y: auto; padding: 24px; color: var(--qn-text); background: var(--qn-editor); border: 1px solid var(--qn-border); border-radius: 16px; }
 dialog::backdrop { background: rgba(0, 0, 0, .5); }
 dialog .table { --bs-table-bg: transparent; --bs-table-color: var(--qn-text); --bs-table-border-color: var(--qn-border); }
+
+.library-controls .form-select { width: auto; flex: 1; min-width: 120px; color: var(--qn-text); background-color: var(--qn-surface-soft); border-color: var(--qn-border); }
+.library-controls #resultCount { flex-basis: 100%; }
+.note-row[aria-current="true"] { outline-offset: -3px; }

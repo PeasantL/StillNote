@@ -193,3 +193,26 @@ def test_history_retention_is_bounded(tmp_path):
     client.delete(url + '/permanent', json={'revision': trashed['revision']})
     with sqlite3.connect(path) as database:
         assert database.execute('SELECT COUNT(*) FROM note_history').fetchone()[0] == 0
+
+
+def test_pagination_sort_and_pinned_filter(client):
+    for title in ['Charlie', 'alpha', 'Bravo']:
+        client.post('/api/notes', json={'title': title})
+    response = client.get('/api/notes?summary=1&limit=2&sort=title')
+    assert response.headers['X-Total-Count'] == '3'
+    assert [note['title'] for note in response.get_json()] == ['alpha', 'Bravo']
+    assert client.get('/api/notes?limit=2&offset=2&sort=title').get_json()[0]['title'] == 'Charlie'
+    client.patch('/api/notes/1', json={'pinned': True})
+    assert len(client.get('/api/notes?pinned=1&limit=1').get_json()) == 1
+    for query in ['limit=0', 'limit=no', 'offset=-1', 'sort=invalid']:
+        assert client.get('/api/notes?' + query).status_code == 400
+
+
+def test_tag_rename_merge_conflicts_with_stale_note(client):
+    first = client.post('/api/notes', json={'tags': ['old', 'target']}).get_json()
+    client.post('/api/notes', json={'tags': ['old']})
+    response = client.post('/api/tags/rename', json={'from': 'old', 'to': 'target'})
+    assert response.get_json() == {'updated': 2}
+    assert all(note['tags'] == ['target'] for note in client.get('/api/notes').get_json())
+    assert client.patch(f'/api/notes/{first["id"]}', json={'content': 'stale', 'revision': first['revision']}).status_code == 409
+    assert client.get(f'/api/notes/{first["id"]}/history').get_json()

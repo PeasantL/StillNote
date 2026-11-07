@@ -44,7 +44,7 @@
         <input type="file" id="importFile" accept=".json,application/json" hidden>
         <button class="nav-link text-start" id="exportNotes">Export Markdown</button>
       </nav>
-      <div class="sidebar-heading px-3 mt-4 mb-2">Tags</div>
+      <div class="sidebar-heading px-3 mt-4 mb-2">Tags <button class="btn quiet-button btn-sm" id="renameTag" aria-label="Rename or merge a tag">Edit</button></div>
       <nav id="tagList" class="nav nav-pills flex-column px-2 gap-1"></nav>
       <div class="sidebar-footer mt-auto d-flex flex-wrap gap-1">
         <button class="btn quiet-button btn-sm" id="openUsage">Usage</button>
@@ -70,7 +70,14 @@
           </div>
         </div>
       </header>
+        <div class="library-controls px-3 pb-2 d-flex flex-wrap gap-2 align-items-center">
+          <label class="visually-hidden" for="sortNotes">Sort notes</label>
+          <select id="sortNotes" class="form-select form-select-sm" aria-label="Sort notes"><option value="updated">Recently edited</option><option value="created">Recently created</option><option value="title">Title</option></select>
+          <button class="btn quiet-button btn-sm" id="clearFilters">Clear filters</button>
+          <span id="resultCount" class="small text-secondary" role="status"></span>
+        </div>
       <div id="notesList" class="list-group list-group-flush" aria-live="polite"></div>
+<button class="btn quiet-button m-3 d-none" id="loadMore">Load more notes</button>
       <div id="emptyList" class="empty-state p-4 text-center text-secondary d-none">No notes here yet.</div>
     </section>
 
@@ -114,7 +121,8 @@
             <button class="btn quiet-button tag-edit-button" id="editTags" aria-expanded="false" aria-controls="tagEditor">Add tags</button>
             <div id="tagEditor" class="d-none">
               <label class="visually-hidden" for="noteTags">Tags, separated by commas</label>
-              <input id="noteTags" class="form-control tag-input" placeholder="e.g. ideas, personal" aria-describedby="tagHelp">
+              <datalist id="tagSuggestions"></datalist>
+              <input list="tagSuggestions" id="noteTags" class="form-control tag-input" placeholder="e.g. ideas, personal" aria-describedby="tagHelp">
               <span class="tag-help" id="tagHelp">Separate tags with commas.</span>
               <button class="btn quiet-button btn-sm" id="doneTags">Done</button>
             </div>

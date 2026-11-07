@@ -214,9 +214,24 @@ def create_app(test_config=None):
         if tag:
             sql += " AND tags.name = ? COLLATE NOCASE"
             parameters.append(tag)
-        sql += " ORDER BY notes.pinned DESC, notes.updated_at DESC, notes.id DESC"
+        if request.args.get("pinned") == "1":
+            sql += " AND notes.pinned = 1"
+        count_sql = "SELECT COUNT(*) FROM (" + sql + ")"
+        sort = {"updated": "notes.updated_at DESC", "created": "notes.created_at DESC", "title": "notes.title COLLATE NOCASE ASC"}.get(request.args.get("sort", "updated"))
+        if sort is None:
+            abort(400, description="Unknown sort order.")
+        sql += f" ORDER BY notes.pinned DESC, {sort}, notes.id DESC"
+        limit = request.args.get("limit", type=int)
+        offset = request.args.get("offset", 0, type=int)
+        if ("limit" in request.args and (limit is None or not 1 <= limit <= 200)) or offset is None or offset < 0:
+            abort(400, description="Use a limit from 1 to 200 and a nonnegative offset.")
+        query_parameters = list(parameters)
+        if limit is not None:
+            sql += " LIMIT ? OFFSET ?"
+            query_parameters.extend([limit, offset])
         with connect() as database:
-            rows = database.execute(sql, parameters).fetchall()
+            rows = database.execute(sql, query_parameters).fetchall()
+            total = database.execute(count_sql, parameters).fetchone()[0]
             # Fetch tags in batches instead of one query per note.
             result = [dict(row, pinned=bool(row["pinned"]), archived=bool(row["archived"]), tags=[]) for row in rows]
             by_id = {note["id"]: note for note in result}
@@ -228,7 +243,9 @@ def create_app(test_config=None):
                     f"SELECT note_id, name FROM note_tags JOIN tags ON tags.id = tag_id WHERE note_id IN ({placeholders}) ORDER BY name COLLATE NOCASE", batch
                 ):
                     by_id[tag_row["note_id"]]["tags"].append(tag_row["name"])
-            return jsonify(result)
+            response = jsonify(result)
+            response.headers["X-Total-Count"] = str(total)
+            return response
 
     @app.post("/api/notes")
     def create_note():
@@ -398,6 +415,32 @@ def create_app(test_config=None):
                 replace_tags(database, cursor.lastrowid, normalise_tags(note["tags"]))
                 ids.append(cursor.lastrowid)
         return jsonify(imported=len(ids), ids=ids), 201
+
+    @app.post("/api/tags/rename")
+    def rename_tag():
+        payload = payload_object()
+        source, target = payload.get("from"), payload.get("to")
+        if not isinstance(source, str) or not isinstance(target, str) or not target.strip() or len(target.strip()) > 40 or "," in target:
+            abort(400, description="Provide a source tag and a new name of 1–40 characters without commas.")
+        target = target.strip()
+        with connect() as database:
+            database.execute("BEGIN IMMEDIATE")
+            old = database.execute("SELECT id FROM tags WHERE name = ? COLLATE NOCASE", (source,)).fetchone()
+            if old is None:
+                abort(404)
+            affected = database.execute("SELECT notes.* FROM notes JOIN note_tags ON notes.id = note_id WHERE tag_id = ?", (old["id"],)).fetchall()
+            for note in affected:
+                snapshot_note(database, note, force=True)
+            database.execute("INSERT OR IGNORE INTO tags (name) VALUES (?)", (target,))
+            new = database.execute("SELECT id FROM tags WHERE name = ? COLLATE NOCASE", (target,)).fetchone()
+            if new["id"] == old["id"]:
+                database.execute("UPDATE tags SET name = ? WHERE id = ?", (target, old["id"]))
+            else:
+                database.execute("INSERT OR IGNORE INTO note_tags SELECT note_id, ? FROM note_tags WHERE tag_id = ?", (new["id"], old["id"]))
+                database.execute("DELETE FROM tags WHERE id = ?", (old["id"],))
+            for note in affected:
+                database.execute("UPDATE notes SET revision = revision + 1 WHERE id = ?", (note["id"],))
+        return jsonify(updated=len(affected))
 
     @app.get("/api/tags")
     def list_tags():
