@@ -2,10 +2,12 @@ import io
 import os
 import sqlite3
 import zipfile
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
 from flask import Flask, Response, abort, jsonify, render_template, request, send_file
+from werkzeug.exceptions import HTTPException
 
 
 def utc_now():
@@ -24,12 +26,17 @@ def create_app(test_config=None):
 
     Path(app.config["DATABASE"]).parent.mkdir(parents=True, exist_ok=True)
 
+    @contextmanager
     def connect():
         connection = sqlite3.connect(app.config["DATABASE"])
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON")
         connection.execute("PRAGMA journal_mode = WAL")
-        return connection
+        try:
+            with connection:
+                yield connection
+        finally:
+            connection.close()
 
     def initialise_database():
         with connect() as database:
@@ -60,6 +67,10 @@ def create_app(test_config=None):
                 CREATE INDEX IF NOT EXISTS notes_archived_idx ON notes(archived);
                 """
             )
+            columns = {row["name"] for row in database.execute("PRAGMA table_info(notes)")}
+            if "revision" not in columns:
+                database.execute("ALTER TABLE notes ADD COLUMN revision INTEGER NOT NULL DEFAULT 1")
+            database.execute("CREATE INDEX IF NOT EXISTS note_tags_tag_idx ON note_tags(tag_id, note_id)")
 
     def note_as_dict(database, row):
         tags = database.execute(
@@ -114,6 +125,40 @@ def create_app(test_config=None):
             "DELETE FROM tags WHERE id NOT IN (SELECT DISTINCT tag_id FROM note_tags)"
         )
 
+    def payload_object():
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict):
+            abort(400, description="Expected a JSON object.")
+        return payload
+
+    def validate_fields(payload):
+        for field, limit in (("title", 200), ("content", 1_000_000)):
+            if field in payload and (not isinstance(payload[field], str) or len(payload[field]) > limit):
+                abort(400, description=f"{field} must be text with at most {limit} characters.")
+        for field in ("pinned", "archived"):
+            if field in payload and not isinstance(payload[field], bool):
+                abort(400, description=f"{field} must be true or false.")
+        if "revision" in payload and (type(payload["revision"]) is not int or payload["revision"] < 1):
+            abort(400, description="revision must be a positive integer.")
+        if "tags" in payload:
+            tags = payload["tags"]
+            if isinstance(tags, str):
+                tags = tags.split(",")
+            if not isinstance(tags, list) or any(not isinstance(tag, str) for tag in tags):
+                abort(400, description="tags must be text or a list of strings.")
+            if len([tag for tag in tags if tag.strip()]) > 20 or any(len(tag.strip()) > 40 for tag in tags):
+                abort(400, description="Use at most 20 tags, each at most 40 characters.")
+
+    @app.errorhandler(HTTPException)
+    def http_error(error):
+        return jsonify(error=error.description), error.code
+
+    @app.after_request
+    def private_response(response):
+        if request.path.startswith(("/api/", "/export/")):
+            response.headers["Cache-Control"] = "no-store"
+        return response
+
     initialise_database()
 
     @app.get("/")
@@ -129,7 +174,11 @@ def create_app(test_config=None):
         archived = 1 if request.args.get("archived") == "1" else 0
         search = request.args.get("q", "").strip()
         tag = request.args.get("tag", "").strip()
-        sql = "SELECT DISTINCT notes.* FROM notes"
+        summary = request.args.get("summary") == "1"
+        fields = "notes.*"
+        if summary:
+            fields = "notes.id, notes.title, notes.pinned, notes.archived, notes.created_at, notes.updated_at, notes.revision, substr(notes.content, 1, 240) AS preview"
+        sql = f"SELECT DISTINCT {fields} FROM notes"
         parameters = []
         if tag:
             sql += " JOIN note_tags ON note_tags.note_id = notes.id JOIN tags ON tags.id = note_tags.tag_id"
@@ -142,21 +191,35 @@ def create_app(test_config=None):
         if tag:
             sql += " AND tags.name = ? COLLATE NOCASE"
             parameters.append(tag)
-        sql += " ORDER BY notes.pinned DESC, notes.updated_at DESC"
+        sql += " ORDER BY notes.pinned DESC, notes.updated_at DESC, notes.id DESC"
         with connect() as database:
             rows = database.execute(sql, parameters).fetchall()
-            return jsonify([note_as_dict(database, row) for row in rows])
+            # Fetch tags in batches instead of one query per note.
+            result = [dict(row, pinned=bool(row["pinned"]), archived=bool(row["archived"]), tags=[]) for row in rows]
+            by_id = {note["id"]: note for note in result}
+            ids = list(by_id)
+            for offset in range(0, len(ids), 500):
+                batch = ids[offset:offset + 500]
+                placeholders = ",".join("?" for _ in batch)
+                for tag_row in database.execute(
+                    f"SELECT note_id, name FROM note_tags JOIN tags ON tags.id = tag_id WHERE note_id IN ({placeholders}) ORDER BY name COLLATE NOCASE", batch
+                ):
+                    by_id[tag_row["note_id"]]["tags"].append(tag_row["name"])
+            return jsonify(result)
 
     @app.post("/api/notes")
     def create_note():
-        payload = request.get_json(silent=True) or {}
+        payload = payload_object()
+        validate_fields(payload)
         now = utc_now()
         title = str(payload.get("title") or "Untitled note").strip()[:200] or "Untitled note"
         with connect() as database:
             cursor = database.execute(
-                "INSERT INTO notes (title, content, created_at, updated_at) VALUES (?, '', ?, ?)",
-                (title, now, now),
+                "INSERT INTO notes (title, content, created_at, updated_at) VALUES (?, ?, ?, ?)",
+                (title, payload.get("content", ""), now, now),
             )
+            if "tags" in payload:
+                replace_tags(database, cursor.lastrowid, normalise_tags(payload["tags"]))
             row = get_note(database, cursor.lastrowid)
             return jsonify(note_as_dict(database, row)), 201
 
@@ -167,20 +230,22 @@ def create_app(test_config=None):
 
     @app.patch("/api/notes/<int:note_id>")
     def update_note(note_id):
-        payload = request.get_json(silent=True)
-        if not isinstance(payload, dict):
-            return {"error": "Expected a JSON object."}, 400
+        payload = payload_object()
+        validate_fields(payload)
         allowed = {"title", "content", "pinned", "archived", "tags"}
         if not (set(payload) & allowed):
             return {"error": "No supported fields were provided."}, 400
         with connect() as database:
+            database.execute("BEGIN IMMEDIATE")
             current = get_note(database, note_id)
+            if "revision" in payload and payload["revision"] != current["revision"]:
+                return {"error": "This note changed elsewhere. Your edits are kept locally; reopen the note to review them.", "current": note_as_dict(database, current)}, 409
             title = str(payload.get("title", current["title"])).strip()[:200] or "Untitled note"
             content = str(payload.get("content", current["content"]))[:1_000_000]
             pinned = int(bool(payload.get("pinned", current["pinned"])))
             archived = int(bool(payload.get("archived", current["archived"])))
             database.execute(
-                "UPDATE notes SET title = ?, content = ?, pinned = ?, archived = ?, updated_at = ? WHERE id = ?",
+                "UPDATE notes SET title = ?, content = ?, pinned = ?, archived = ?, updated_at = ?, revision = revision + 1 WHERE id = ?",
                 (title, content, pinned, archived, utc_now(), note_id),
             )
             if "tags" in payload:

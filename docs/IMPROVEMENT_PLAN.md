@@ -87,3 +87,15 @@ References: [Flask SQLite connection lifecycle](https://flask.palletsprojects.co
 
 - Initial inspection complete; working tree was clean. Live notes were accessed read-only.
 - Implementation and measured verification results will be recorded as each slice completes.
+
+### Paused checkpoint — 8 November 2026
+
+Paused at the user's request after the first implementation slice; phases 2 onward have not started.
+
+Implemented: serialized saves and save-before-navigation; browser-local pending drafts with reload recovery, explicit conflict recovery as a new note and a Save now control; additive revision migration and atomic stale-write rejection; compact library previews, batched tag queries and row updates without full-library reloads on ordinary saves; strict input validation; explicit connection closure; no-store API/export responses; safe DOM construction for tag names; stale list-response suppression; graceful storage errors; restored browser zoom.
+
+Verification: **27 tests passed**, including the existing WebKit/iPad layout checks and new behavioural tests for immediate switching, typing during an in-flight save, no library/tag refetch on body-only saves, failed-save navigation blocking, reload recovery, concurrent-version recovery, literal tag rendering, storage failure, legacy migration, invalid payloads and literal search. `git diff --check` passed. Tests ran in a disposable Playwright Python container with read-only source and temporary databases because the host lacks pip/venv support. No live database mutations or deployment occurred.
+
+Remaining before release: real iPad verification; broader stale-search and navigation-failure coverage; performance benchmarks on synthetic larger libraries. Revision checks are optional for older API clients, and pending drafts share storage between tabs, so this is not full offline synchronization. Permanent deletion still exists until phase 3. No analytics have been implemented or enabled. No personal note text or titles were added to the repository.
+
+Resume with a review of this checkpoint, then phase 2 (opt-in private usage insights), followed by recoverable trash and journal capture. Backups and restore remain the next data-safety milestone.

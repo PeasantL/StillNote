@@ -18,8 +18,8 @@ loopback-only. For example, `PORT=1000` serves it at
 
 ```sh
 python -m venv .venv
-.venv\Scripts\pip install -r requirements.txt
-.venv\Scripts\python -m flask --app app run --debug
+.venv/bin/pip install -r requirements.txt
+.venv/bin/python -m flask --app app run --debug
 ```
 
 Open <http://127.0.0.1:5000>.
@@ -27,8 +27,8 @@ Open <http://127.0.0.1:5000>.
 ## Test
 
 ```sh
-.venv\Scripts\pip install pytest
-.venv\Scripts\python -m pytest
+.venv/bin/pip install pytest
+.venv/bin/python -m pytest
 ```
 
 ## iPad landscape checks
@@ -61,3 +61,31 @@ check Safari browser mode and a hardware or floating keyboard if used.
 - `Ctrl+N`: create a note
 - `Ctrl+K`: focus search
 - `Ctrl+S`: save now
+
+## Saving and recovery
+
+Edits autosave after a short pause. **Save now** (or Ctrl/Cmd+S) retries a failed
+save. Switching notes or creating a note waits for pending edits to save; on
+failure, the current editor stays open.
+
+Pending title, body and tags are also stored locally in this browser for recovery
+on reload. This recovery copy contains your note text; it is separate from any
+future usage analytics. Successful saves remove it. Browser storage may be
+unavailable or cleared, so recovery drafts are not a backup. Avoid editing the
+same note offline in several tabs: local recovery storage is shared by this
+browser's tabs.
+
+If the saved note changed on another device or tab, the editor keeps your draft
+and offers **Recover as new note** or **Discard draft**. Recovery preserves the
+other version. The updated client sends a revision with each save; older API
+clients that omit revisions remain compatible but do not get conflict protection.
+
+Library requests use compact previews; opening a note loads its full text. The
+SQLite revision column is added automatically on startup without rewriting note
+contents. Back up the database before deploying schema changes. The current
+Markdown ZIP export is available at `/export/notes.zip`; it is not a full database
+backup and does not preserve tags or note state.
+
+See [the improvement plan](docs/IMPROVEMENT_PLAN.md) for priorities, acceptance
+criteria and implementation status. Usage tracking and recoverable trash remain
+planned; no analytics are currently collected.

@@ -45,3 +45,51 @@ def test_export(client):
     assert response.status_code == 200
     assert response.mimetype == "application/zip"
 
+
+
+def test_revision_conflict_preserves_newer_note(client):
+    note = client.post('/api/notes', json={'content': 'original', 'tags': ['idea']}).get_json()
+    url = f"/api/notes/{note['id']}"
+    saved = client.patch(url, json={'content': 'newer', 'revision': note['revision']}).get_json()
+    conflict = client.patch(url, json={'content': 'stale', 'tags': [], 'revision': note['revision']})
+    assert conflict.status_code == 409
+    assert client.get(url).get_json()['content'] == 'newer'
+    assert client.get(url).get_json()['tags'] == ['idea']
+    assert saved['revision'] == note['revision'] + 1
+
+
+@pytest.mark.parametrize('payload', [[], 'text', None, {'content': None}, {'pinned': 'false'},
+                                    {'tags': [1]}, {'title': 'x' * 201}, {'revision': True}])
+def test_invalid_input_does_not_modify_note(client, payload):
+    note = client.post('/api/notes', json={}).get_json()
+    url = f"/api/notes/{note['id']}"
+    assert client.patch(url, json=payload).status_code == 400
+    assert client.get(url).get_json() == note
+    assert client.post('/api/notes', json=payload).status_code == 400
+
+
+def test_summary_searches_full_content_and_keeps_literal_wildcards(client):
+    note = client.post('/api/notes', json={'content': 'a' * 1000 + '100%_done', 'tags': ['Beta', 'alpha']}).get_json()
+    response = client.get('/api/notes?summary=1&q=100%25_done')
+    result = response.get_json()
+    assert len(result) == 1
+    assert result[0]['id'] == note['id']
+    assert 'content' not in result[0]
+    assert len(result[0]['preview']) == 240
+    assert result[0]['tags'] == ['alpha', 'Beta']
+    assert response.headers['Cache-Control'] == 'no-store'
+    assert client.get('/api/notes?q=100X_done').get_json() == []
+
+
+def test_migration_preserves_existing_note(tmp_path):
+    import sqlite3
+    path = str(tmp_path / 'legacy.db')
+    with sqlite3.connect(path) as db:
+        db.execute('CREATE TABLE notes (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, content TEXT NOT NULL, pinned INTEGER NOT NULL DEFAULT 0, archived INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)')
+        db.execute("INSERT INTO notes VALUES (7, 'Legacy', 'Keep this text', 1, 0, '2020-01-01', '2020-01-02')")
+    for _ in range(2):
+        app = create_app({'TESTING': True, 'DATABASE': path})
+        note = app.test_client().get('/api/notes/7').get_json()
+        assert note['content'] == 'Keep this text'
+        assert note['pinned'] is True
+        assert note['revision'] == 1

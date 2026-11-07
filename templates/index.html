@@ -2,7 +2,7 @@
 <html lang="en" data-bs-theme="dark" class="sn-loading">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>StillNote</title>
   <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='icon.svg') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap.min.css') }}">
@@ -80,6 +80,7 @@
         <header class="editor-toolbar d-flex align-items-center gap-2">
           <button class="btn icon-button d-md-none" id="backToList" aria-label="Back to notes"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 5-7 7 7 7M5 12h15"/></svg></button>
           <span id="saveStatus" role="status" class="small text-secondary me-auto">Saved</span>
+          <button class="btn quiet-button btn-sm" id="saveNow">Save now</button>
           <button class="btn quiet-button btn-sm" id="pinNote" aria-pressed="false">Pin</button>
           <div class="dropdown">
             <button class="btn icon-button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="More note actions"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
@@ -90,6 +91,11 @@
             </ul>
           </div>
         </header>
+        <div id="draftNotice" class="alert alert-warning m-2 d-none" role="status">
+          This note changed elsewhere. Your draft is still in the editor.
+          <button class="btn btn-sm btn-outline-secondary" id="recoverDraft">Recover as new note</button>
+          <button class="btn btn-sm btn-outline-secondary" id="discardDraft">Discard draft</button>
+        </div>
         <div class="writing-area">
           <label class="visually-hidden" for="noteTitle">Note title</label>
           <input id="noteTitle" class="note-title" maxlength="200" placeholder="Untitled note">
