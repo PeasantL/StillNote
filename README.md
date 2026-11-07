@@ -103,3 +103,38 @@ is never purged automatically.
 **New journal entry** creates an ordinary note titled with today's local date and
 the Diary tag. Each click creates a new entry. **Export Markdown** downloads all
 non-trashed notes after saving pending edits.
+
+
+## Database backups and restore
+
+The backup command uses SQLite's online backup API, includes committed WAL data,
+checks integrity and writes a private file. It works while the app is running.
+Existing destination files are refused. A database backup preserves tags, note
+state, trash and revisions; it excludes browser-only drafts and usage counts.
+
+For a local installation (create the backup directory first):
+
+```sh
+python manage.py backup /safe/backups/stillnote.db --database instance/notes.db
+python manage.py restore /safe/backups/stillnote.db --database /safe/restore/notes.db
+```
+
+Restore always writes to a **new** destination. To verify it, start a separate
+instance with `NOTES_DATABASE=/safe/restore/notes.db` and check its notes and Trash.
+Stop the original instance before switching its database path to the verified
+restored file. Keep the previous database until recovery is confirmed.
+
+After rebuilding the Docker image with this change, back up and copy the result
+to storage outside the container and notes volume:
+
+```sh
+docker exec stillnote python manage.py backup /tmp/stillnote-backup.db --database /app/data/notes.db
+docker cp stillnote:/tmp/stillnote-backup.db ./stillnote-backup.db
+docker exec stillnote rm /tmp/stillnote-backup.db
+```
+
+Choose a fresh destination for every backup, restrict access to the copied file,
+and keep a second copy on another disk or host. Schedule this command with your
+host's scheduler and verify restores periodically. A directory named `backups`
+inside the notes volume does not protect against loss of that volume. Never copy
+only the main database file while it is being written; use the backup command.

@@ -110,3 +110,20 @@ Implemented a native Usage dialog with explicit opt-in, daily counters retained 
 Implemented additive trash migration, a dedicated Trash view, read-only trashed notes, restoration preserving content/tags/pin/archive state, and explicit permanent deletion requiring a current revision. Normal lists, tag counts and Markdown exports omit trash. Stale clients cannot edit a trashed note. Added browser-local-date journal capture, contextual library headings and a visible Markdown export action that flushes pending edits first.
 
 Verification: **33 tests passed**, including exact restoration, stale-revision and permanent-deletion safeguards, export/tag/search exclusion, the browser trash/restore/journal flow and all earlier layout/recovery/privacy tests. No live data changed; deployment remains pending.
+
+### Database recovery and measured performance — 8 November 2026
+
+Added `manage.py backup` and `manage.py restore`, packaged in the Docker image. They use SQLite's online backup API, verify database integrity and expected tables, create private destination files exclusively, and refuse overwrites. Restore writes a new database for verification before switching the running app. The tested recovery preserves committed WAL changes, Unicode text, tags, trash and revisions. README includes local and Docker procedures, external storage guidance and restore verification. Host scheduling and off-host replication remain deployment work.
+
+The full suite passed **35 tests**, followed by focused checks for backup/restore and an additional regression proving a delayed older search response cannot replace newer results. All tests used synthetic data and temporary databases.
+
+Five in-process Flask test-client trials per case, median elapsed time; synthetic notes contain 4,250 characters each. These measure serialization/database work, not network transfer or browser rendering:
+
+| Notes | Full response | Summary response | Full median | Summary median |
+| --- | --- | --- | --- | --- |
+| 1,000 | 4,422,785 bytes | 412,785 bytes | 51.2 ms | 13.8 ms |
+| 10,000 | 44,247,786 bytes | 4,147,786 bytes | 654.7 ms | 147.4 ms |
+
+Summary responses are approximately 91% smaller in this benchmark. Body-only saves also have a browser assertion that no full-library or tag refresh occurs. At 10,000 notes, a 4 MB summary still justifies pagination or incremental loading; this is unnecessary for the current small library and should be introduced with a real retrieval need. FTS remains evidence driven.
+
+Current delivery: phases 1–3 implemented, plus SQLite backup/restore from phase 4. Still planned: versioned portable JSON import/export, coalesced revision history, scheduled external backups, evidence-driven retrieval enhancements and CI/accessibility/platform follow-ups. Actual iPad hardware verification is still required before release. No deployment, live database mutation or analytics opt-in occurred during implementation.
