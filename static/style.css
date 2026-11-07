@@ -62,7 +62,7 @@ body::before {
 }
 button, input, textarea { font: inherit; }
 button { -webkit-tap-highlight-color: transparent; }
-html, body, .app-shell { touch-action: pan-x pan-y; }
+html, body, .app-shell { touch-action: pan-x pan-y pinch-zoom; }
 
 .ambient-orb {
   position: fixed;
@@ -562,3 +562,9 @@ dialog .table { --bs-table-bg: transparent; --bs-table-color: var(--qn-text); --
 .library-controls .form-select { width: auto; flex: 1; min-width: 120px; color: var(--qn-text); background-color: var(--qn-surface-soft); border-color: var(--qn-border); }
 .library-controls #resultCount { flex-basis: 100%; }
 .note-row[aria-current="true"] { outline-offset: -3px; }
+
+/* Navigation remains reachable with the on-screen keyboard open. */
+.sidebar { overflow-y: auto; overscroll-behavior: contain; }
+.sidebar > :not(#tagList) { flex-shrink: 0; }
+.sidebar #tagList { flex-shrink: 0; }
+.note-title:focus-visible, .note-content:focus-visible, .tag-input:focus-visible { outline: 2px solid var(--qn-accent); outline-offset: 2px; }

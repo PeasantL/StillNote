@@ -216,3 +216,10 @@ def test_tag_rename_merge_conflicts_with_stale_note(client):
     assert all(note['tags'] == ['target'] for note in client.get('/api/notes').get_json())
     assert client.patch(f'/api/notes/{first["id"]}', json={'content': 'stale', 'revision': first['revision']}).status_code == 409
     assert client.get(f'/api/notes/{first["id"]}/history').get_json()
+
+
+def test_home_screen_manifest_and_zoom(client):
+    manifest = client.get('/static/manifest.webmanifest').get_json(force=True)
+    assert manifest['display'] == 'standalone'
+    assert client.get('/static/' + manifest['icons'][0]['src']).status_code == 200
+    assert b'user-scalable=no' not in client.get('/').data

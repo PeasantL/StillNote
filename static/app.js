@@ -239,11 +239,17 @@ function scheduleSave() {
   state.saveTimer = setTimeout(saveNote, 650);
 }
 
+function sqlFold(value) { return value.replace(/[A-Z]/g, character => character.toLowerCase()); }
+function compareTitles(a, b) {
+  const first = sqlFold(a.title), second = sqlFold(b.title);
+  return first < second ? -1 : first > second ? 1 : 0;
+}
+
 function noteMatchesView(note) {
 return (state.view === 'trash' ? !!note.deleted_at : !note.deleted_at && note.archived === (state.view === 'archived'))
     && (state.view !== 'pinned' || note.pinned)
     && (!state.tag || note.tags.some(tag => tag.toLowerCase() === state.tag.toLowerCase()))
-    && (!state.search || `${note.title} ${note.content}`.toLowerCase().includes(state.search.toLowerCase()));
+    && (!state.search || [note.title, note.content].some(text => sqlFold(text).includes(sqlFold(state.search))));
 }
 
 function updateListNote(note, previous = null) {
@@ -259,7 +265,7 @@ function updateListNote(note, previous = null) {
     state.notes.push({ ...summary, preview: content.slice(0, 240) });
   }
   state.notes.sort((a, b) => Number(b.pinned) - Number(a.pinned)
-    || (state.sort === 'title' ? a.title.localeCompare(b.title, 'en', { sensitivity: 'base' }) : (state.sort === 'created' ? b.created_at.localeCompare(a.created_at) : b.updated_at.localeCompare(a.updated_at))) || b.id - a.id);
+    || (state.sort === 'title' ? compareTitles(a, b) : (state.sort === 'created' ? b.created_at.localeCompare(a.created_at) : b.updated_at.localeCompare(a.updated_at))) || b.id - a.id);
   renderNotes();
 }
 
@@ -363,7 +369,13 @@ function setActiveView() {
   document.querySelectorAll('[data-view]').forEach(button => button.classList.toggle('active', button.dataset.view === state.view && !state.tag));
 }
 
-function closeSidebar() { document.body.classList.remove('sidebar-open'); }
+function closeSidebar() {
+  const wasOpen = document.body.classList.contains('sidebar-open');
+  document.body.classList.remove('sidebar-open');
+  el.openSidebar.setAttribute('aria-expanded', 'false');
+  document.querySelector('.sidebar').inert = matchMedia('(max-width: 991.98px)').matches;
+  if (wasOpen) el.openSidebar.focus();
+}
 
 function applyTheme(theme) {
   document.documentElement.dataset.bsTheme = theme;
@@ -399,8 +411,8 @@ el.pinNote.addEventListener('click', () => patchSelected({ pinned: !state.select
 el.archiveNote.addEventListener('click', async () => {
   if (!state.selected || !await patchSelected({ archived: !state.selected.archived })) return;
   state.selected = null; document.body.classList.remove('mobile-editing');
-  el.editor.classList.add('d-none'); el.emptyEditor.classList.remove('d-none');
-  await loadNotes();
+  showEmptyEditor();
+  await loadNotes().catch(error => showMessage(error.message));
 });
 el.deleteNote.addEventListener('click', () => changeTrash('trash'));
 el.restoreTrash.addEventListener('click', () => changeTrash('restore'));
@@ -424,7 +436,12 @@ el.tagList.addEventListener('click', async event => {
   });
 });
 el.themeButton.addEventListener('click', () => { applyTheme(document.documentElement.dataset.bsTheme === 'dark' ? 'light' : 'dark'); usage.record('theme'); });
-el.openSidebar.addEventListener('click', () => document.body.classList.add('sidebar-open'));
+el.openSidebar.addEventListener('click', () => {
+  document.querySelector('.sidebar').inert = false;
+  document.body.classList.add('sidebar-open');
+  el.openSidebar.setAttribute('aria-expanded', 'true');
+  el.closeSidebar.focus();
+});
 el.closeSidebar.addEventListener('click', closeSidebar);
 el.sidebarScrim.addEventListener('click', closeSidebar);
 el.backToList.addEventListener('click', () => document.body.classList.remove('mobile-editing'));
@@ -590,3 +607,21 @@ document.getElementById('renameTag').addEventListener('click', () => navigate(as
   if (state.selected) showEditor(await api(`/api/notes/${state.selected.id}${state.selected.deleted_at ? '?trash=1' : ''}`));
   setActiveView(); await Promise.all([loadNotes(), loadTags()]);
 }));
+
+const sidebar = document.querySelector('.sidebar');
+const narrowNavigation = matchMedia('(max-width: 991.98px)');
+function syncNavigation() {
+  sidebar.inert = narrowNavigation.matches && !document.body.classList.contains('sidebar-open');
+}
+narrowNavigation.addEventListener('change', syncNavigation);
+syncNavigation();
+sidebar.addEventListener('keydown', event => {
+  if (!narrowNavigation.matches || !document.body.classList.contains('sidebar-open')) return;
+  if (event.key === 'Escape') { event.preventDefault(); closeSidebar(); }
+  if (event.key === 'Tab') {
+    const controls = [...sidebar.querySelectorAll('a, button, input, select, [tabindex="0"]')].filter(control => control.offsetParent !== null && !control.disabled);
+    const first = controls[0], last = controls.at(-1);
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+  }
+});

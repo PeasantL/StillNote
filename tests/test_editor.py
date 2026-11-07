@@ -254,3 +254,18 @@ def test_library_pagination_sort_and_filter_reset(editor):
     page.locator('#clearFilters').click()
     page.wait_for_function('state.notes.length === 100')
     assert page.locator('#search').input_value() == ''
+
+
+def test_narrow_navigation_focus_and_escape(editor):
+    page, _, _, _ = editor
+    page.set_viewport_size({'width': 600, 'height': 500})
+    page.locator('#backToList').click()
+    page.locator('#openSidebar').click()
+    assert page.locator('#openSidebar').get_attribute('aria-expanded') == 'true'
+    page.locator('#openUsage').focus()
+    page.keyboard.press('Tab')
+    page.keyboard.press('Tab')
+    assert page.locator('.brand').evaluate('el => el === document.activeElement')
+    page.keyboard.press('Escape')
+    assert page.locator('#notesSidebar').evaluate('el => el.inert')
+    assert page.locator('#openSidebar').evaluate('el => el === document.activeElement')
