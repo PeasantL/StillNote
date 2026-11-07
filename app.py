@@ -80,6 +80,7 @@ def create_app(test_config=None):
                 database.execute("ALTER TABLE notes ADD COLUMN revision INTEGER NOT NULL DEFAULT 1")
             if "deleted_at" not in columns:
                 database.execute("ALTER TABLE notes ADD COLUMN deleted_at TEXT")
+            database.execute("CREATE INDEX IF NOT EXISTS notes_browse_idx ON notes(deleted_at, archived, pinned DESC, updated_at DESC, id DESC)")
             database.execute("CREATE INDEX IF NOT EXISTS note_tags_tag_idx ON note_tags(tag_id, note_id)")
 
     def note_as_dict(database, row):
@@ -216,7 +217,7 @@ def create_app(test_config=None):
             parameters.append(tag)
         if request.args.get("pinned") == "1":
             sql += " AND notes.pinned = 1"
-        count_sql = "SELECT COUNT(*) FROM (" + sql + ")"
+        count_sql = "SELECT COUNT(DISTINCT notes.id) FROM notes" + sql.partition(" FROM notes")[2]
         sort = {"updated": "notes.updated_at DESC", "created": "notes.created_at DESC", "title": "notes.title COLLATE NOCASE ASC"}.get(request.args.get("sort", "updated"))
         if sort is None:
             abort(400, description="Unknown sort order.")

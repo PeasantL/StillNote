@@ -137,3 +137,7 @@ Implemented 20 checkpoints per note, capturing the previous version at most once
 ### Retrieval and organisation — 8 November 2026
 
 Implemented 100-note library batches with Load more, total counts, persistent sort (edited/created/title), clear filters, server-side pinned filtering, tag suggestions, and transactional tag rename/merge. Tag changes snapshot affected notes and advance revisions so stale editors cannot silently reintroduce old tags. Literal substring search remains unchanged. The API retains its array response and exposes totals in a header; optional limits are capped at 200. Focused API/pagination browser checks: 25 passed. FTS, structured journal forms, Markdown preview and editor customisation remain conditional ideas awaiting usage evidence, not release requirements.
+
+### Final performance correction
+
+Bounded transfer initially still took 147.1 ms at 10,000 notes because the total-count query materialised every preview. Replaced it with a count of matching IDs and added a browse index. With the same five-trial synthetic benchmark, first-page medians are **2.7 ms / 41,303 bytes at 1,000 notes** and **3.6 ms / 41,503 bytes at 10,000 notes**. Each returns 100 summaries with an accurate total. This measures local database/serialization work, not end-to-end latency. Search still scans matching text because literal substring semantics are intentionally preserved.
