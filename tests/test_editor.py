@@ -211,3 +211,27 @@ def test_search_ignores_response_from_older_query(editor):
         route.fulfill(response=response)
     page.evaluate('() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))')
     assert page.locator('#notesList [data-id]').get_attribute('data-id') == str(second['id'])
+
+
+def test_history_preview_and_restore(editor):
+    page, client, first, _ = editor
+    page.locator('#noteContent').fill('Newer writing')
+    page.locator('#saveNow').click()
+    page.wait_for_function("document.querySelector('#saveStatus').textContent === 'Saved'")
+    page.locator('[aria-label="More note actions"]').click()
+    page.locator('#openHistory').click()
+    page.wait_for_selector('#historyDialog[open]')
+    assert 'First body' in page.locator('#historyPreview').input_value()
+    page.locator('#restoreHistory').click()
+    page.wait_for_function("document.querySelector('#noteContent').value === 'First body'")
+    assert client.get(f'/api/notes/{first["id"]}/history').get_json()[0]['id'] > 1
+
+
+def test_json_import_from_file(editor):
+    import json
+    page, client, _, _ = editor
+    backup = client.get('/export/notes.json').get_json()
+    page.on('dialog', lambda dialog: dialog.accept())
+    page.locator('#importFile').set_input_files({'name': 'backup.json', 'mimeType': 'application/json', 'buffer': json.dumps(backup).encode()})
+    page.wait_for_function('state.notes.length === 4')
+    assert len(client.get('/api/notes').get_json()) == 4

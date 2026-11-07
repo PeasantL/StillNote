@@ -39,6 +39,9 @@
         </button>
         <button class="nav-link text-start" data-view="trash">Trash</button>
         <button class="nav-link text-start" id="newJournal">New journal entry</button>
+        <button class="nav-link text-start" id="exportJson">Backup JSON</button>
+        <button class="nav-link text-start" id="importJson">Import JSON</button>
+        <input type="file" id="importFile" accept=".json,application/json" hidden>
         <button class="nav-link text-start" id="exportNotes">Export Markdown</button>
       </nav>
       <div class="sidebar-heading px-3 mt-4 mb-2">Tags</div>
@@ -89,6 +92,7 @@
           <div class="dropdown">
             <button class="btn icon-button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="More note actions"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
             <ul class="dropdown-menu dropdown-menu-end">
+              <li><button class="dropdown-item" id="openHistory">Note history</button></li>
               <li><button class="dropdown-item" id="archiveNote">Archive</button></li>
               <li><hr class="dropdown-divider"></li>
               <li><button class="dropdown-item danger-button" id="deleteNote">Move to Trash</button></li>
@@ -122,6 +126,13 @@
     </main>
   </div>
 
+  <dialog id="historyDialog" aria-labelledby="historyTitle">
+    <div class="d-flex justify-content-between"><h2 id="historyTitle" class="h5">Note history</h2><button class="btn quiet-button" id="closeHistory">Close</button></div>
+    <p>Up to 20 checkpoints, spaced five minutes apart. Restoring also keeps the current version.</p>
+    <label for="historyList">Saved checkpoints</label><select id="historyList" class="form-select mb-3"></select>
+    <label for="historyPreview">Previous text</label><textarea id="historyPreview" class="form-control mb-3" rows="10" readonly></textarea>
+    <button class="btn primary-button" id="restoreHistory" disabled>Restore this version</button>
+  </dialog>
   <dialog id="usageDialog" aria-labelledby="usageTitle">
     <div class="d-flex justify-content-between align-items-center gap-3">
       <h2 id="usageTitle" class="h5">Private usage insights</h2>

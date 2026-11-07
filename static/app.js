@@ -486,3 +486,60 @@ el.exportNotes.addEventListener('click', () => navigate(async () => {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
   usage.record('export');
 }));
+
+const historyDialog = document.getElementById('historyDialog');
+const historyList = document.getElementById('historyList');
+const historyPreview = document.getElementById('historyPreview');
+const restoreHistoryButton = document.getElementById('restoreHistory');
+let historyNoteId = null;
+let historyPreviewRequest = 0;
+async function previewHistory() {
+  const requestId = ++historyPreviewRequest;
+  restoreHistoryButton.disabled = true;
+  historyPreview.value = '';
+  if (!historyList.value) return;
+  try {
+    const note = await api(`/api/notes/${historyNoteId}/history/${historyList.value}`);
+    if (requestId !== historyPreviewRequest) return;
+    historyPreview.value = `${note.title}\n\n${note.content}`;
+    restoreHistoryButton.disabled = !!state.selected?.deleted_at;
+  } catch (error) { showMessage(error.message); }
+}
+document.getElementById('openHistory').addEventListener('click', () => navigate(async () => {
+  if (!state.selected) return;
+  historyNoteId = state.selected.id;
+  const entries = await api(`/api/notes/${historyNoteId}/history`);
+  historyList.replaceChildren(...entries.map(entry => new Option(`${new Date(entry.saved_at).toLocaleString()} — ${entry.title}`, entry.id)));
+  if (!entries.length) historyList.append(new Option('No saved checkpoints yet', ''));
+  await previewHistory();
+  historyDialog.showModal();
+}));
+historyList.addEventListener('change', previewHistory);
+document.getElementById('closeHistory').addEventListener('click', () => historyDialog.close());
+restoreHistoryButton.addEventListener('click', () => navigate(async () => {
+  if (state.selected?.id !== historyNoteId || !historyList.value) return;
+  const note = await api(`/api/notes/${historyNoteId}/history/${historyList.value}/restore`, {
+    method: 'POST', body: JSON.stringify({ revision: state.selected.revision })
+  });
+  historyDialog.close(); showEditor(note);
+  await Promise.all([loadNotes(), loadTags()]);
+}));
+document.getElementById('exportJson').addEventListener('click', () => navigate(async () => {
+  downloadJson(await api('/export/notes.json'), 'stillnote-backup.json');
+  usage.record('export');
+}));
+const importFile = document.getElementById('importFile');
+document.getElementById('importJson').addEventListener('click', () => importFile.click());
+importFile.addEventListener('change', async () => {
+  const file = importFile.files[0];
+  importFile.value = '';
+  if (!file) return;
+  if (file.size > 16 * 1024 * 1024) { showMessage('Import files up to 16 MiB. Use database restore for larger backups.'); return; }
+  await navigate(async () => {
+    const backup = JSON.parse(await file.text());
+    if (!confirm('Import these notes as new copies? Existing notes stay in place. Importing the same backup again creates duplicates.')) return;
+    const result = await api('/api/import', { method: 'POST', body: JSON.stringify(backup) });
+    await Promise.all([loadNotes(), loadTags()]);
+    showMessage(`Imported ${result.imported} notes as new copies.`);
+  });
+});

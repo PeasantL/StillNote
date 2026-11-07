@@ -1,4 +1,5 @@
 import io
+import json
 import os
 import sqlite3
 import zipfile
@@ -19,7 +20,7 @@ def create_app(test_config=None):
     default_database = Path(app.instance_path) / "notes.db"
     app.config.from_mapping(
         DATABASE=os.environ.get("NOTES_DATABASE", str(default_database)),
-        MAX_CONTENT_LENGTH=2 * 1024 * 1024,
+        MAX_CONTENT_LENGTH=16 * 1024 * 1024,
     )
     if test_config:
         app.config.update(test_config)
@@ -63,6 +64,13 @@ def create_app(test_config=None):
                     PRIMARY KEY (note_id, tag_id)
                 );
 
+                CREATE TABLE IF NOT EXISTS note_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    note_id INTEGER NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+                    saved_at TEXT NOT NULL,
+                    snapshot TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS history_note_idx ON note_history(note_id, id DESC);
                 CREATE INDEX IF NOT EXISTS notes_updated_at_idx ON notes(updated_at DESC);
                 CREATE INDEX IF NOT EXISTS notes_archived_idx ON notes(archived);
                 """
@@ -88,6 +96,14 @@ def create_app(test_config=None):
         result["archived"] = bool(result["archived"])
         result["tags"] = [tag["name"] for tag in tags]
         return result
+
+    def snapshot_note(database, current, force=False):
+        latest = database.execute("SELECT saved_at FROM note_history WHERE note_id = ? ORDER BY id DESC LIMIT 1", (current["id"],)).fetchone()
+        now = utc_now()
+        if force or latest is None or (datetime.fromisoformat(now) - datetime.fromisoformat(latest["saved_at"])).total_seconds() >= 300:
+            database.execute("INSERT INTO note_history (note_id, saved_at, snapshot) VALUES (?, ?, ?)",
+                             (current["id"], now, json.dumps(note_as_dict(database, current))))
+            database.execute("DELETE FROM note_history WHERE note_id = ? AND id NOT IN (SELECT id FROM note_history WHERE note_id = ? ORDER BY id DESC LIMIT 20)", (current["id"], current["id"]))
 
     def get_note(database, note_id, include_deleted=False):
         row = database.execute("SELECT * FROM notes WHERE id = ?", (note_id,)).fetchone()
@@ -169,6 +185,8 @@ def create_app(test_config=None):
 
     @app.get("/health")
     def health():
+        with connect() as database:
+            database.execute("SELECT id FROM notes LIMIT 1").fetchone()
         return {"status": "ok"}
 
     @app.get("/api/notes")
@@ -247,6 +265,8 @@ def create_app(test_config=None):
                 return {"error": "This note is in Trash. Recover your draft as a new note or restore the saved note first."}, 409
             if "revision" in payload and payload["revision"] != current["revision"]:
                 return {"error": "This note changed elsewhere. Your edits are kept locally; reopen the note to review them.", "current": note_as_dict(database, current)}, 409
+            if any(payload[field] != current[field] for field in ("title", "content", "pinned", "archived") if field in payload) or "tags" in payload and normalise_tags(payload["tags"]) != note_as_dict(database, current)["tags"]:
+                snapshot_note(database, current)
             title = str(payload.get("title", current["title"])).strip()[:200] or "Untitled note"
             content = str(payload.get("content", current["content"]))[:1_000_000]
             pinned = int(bool(payload.get("pinned", current["pinned"])))
@@ -302,6 +322,82 @@ def create_app(test_config=None):
             database.execute("DELETE FROM notes WHERE id = ?", (note_id,))
             database.execute("DELETE FROM tags WHERE id NOT IN (SELECT tag_id FROM note_tags)")
         return Response(status=204)
+
+    @app.get("/api/notes/<int:note_id>/history")
+    def list_history(note_id):
+        with connect() as database:
+            get_note(database, note_id, include_deleted=True)
+            rows = database.execute("SELECT id, saved_at, snapshot FROM note_history WHERE note_id = ? ORDER BY id DESC", (note_id,)).fetchall()
+            return jsonify([dict(id=row["id"], saved_at=row["saved_at"], title=json.loads(row["snapshot"])["title"]) for row in rows])
+
+    @app.get("/api/notes/<int:note_id>/history/<int:history_id>")
+    def read_history(note_id, history_id):
+        with connect() as database:
+            get_note(database, note_id, include_deleted=True)
+            row = database.execute("SELECT snapshot FROM note_history WHERE id = ? AND note_id = ?", (history_id, note_id)).fetchone()
+            if row is None:
+                abort(404)
+            return jsonify(json.loads(row["snapshot"]))
+
+    @app.post("/api/notes/<int:note_id>/history/<int:history_id>/restore")
+    def restore_history(note_id, history_id):
+        payload = payload_object()
+        validate_fields(payload)
+        with connect() as database:
+            database.execute("BEGIN IMMEDIATE")
+            current = get_note(database, note_id)
+            check_revision(payload, current, required=True)
+            row = database.execute("SELECT snapshot FROM note_history WHERE id = ? AND note_id = ?", (history_id, note_id)).fetchone()
+            if row is None:
+                abort(404)
+            previous = json.loads(row["snapshot"])
+            snapshot_note(database, current, force=True)
+            database.execute("UPDATE notes SET title = ?, content = ?, pinned = ?, archived = ?, updated_at = ?, revision = revision + 1 WHERE id = ?",
+                             (previous["title"], previous["content"], previous["pinned"], previous["archived"], utc_now(), note_id))
+            replace_tags(database, note_id, previous["tags"])
+            return jsonify(note_as_dict(database, get_note(database, note_id)))
+
+    @app.get("/export/notes.json")
+    def export_json():
+        with connect() as database:
+            database.execute("BEGIN")
+            notes = [note_as_dict(database, row) for row in database.execute("SELECT * FROM notes ORDER BY id")]
+        response = jsonify(format="stillnote", version=1, exported_at=utc_now(), notes=notes)
+        response.headers["Content-Disposition"] = 'attachment; filename="stillnote-backup.json"'
+        return response
+
+    @app.post("/api/import")
+    def import_json():
+        payload = payload_object()
+        if payload.get("format") != "stillnote" or type(payload.get("version")) is not int or payload["version"] != 1 or not isinstance(payload.get("notes"), list):
+            abort(400, description="Expected a StillNote version 1 JSON backup.")
+        if len(payload["notes"]) > 10_000:
+            abort(400, description="Import at most 10,000 notes at once.")
+        # Validate the entire archive before opening the write transaction.
+        required = {"title", "content", "tags", "pinned", "archived", "created_at", "updated_at", "deleted_at"}
+        for note in payload["notes"]:
+            if not isinstance(note, dict) or not required <= note.keys() or not isinstance(note["tags"], list):
+                abort(400, description="A backup note is missing required fields.")
+            validate_fields(note)
+            for field in ("created_at", "updated_at", "deleted_at"):
+                value = note[field]
+                if field == "deleted_at" and value is None:
+                    continue
+                try:
+                    if not isinstance(value, str) or len(value) > 64:
+                        raise ValueError()
+                    datetime.fromisoformat(value)
+                except ValueError:
+                    abort(400, description=f"Invalid {field} timestamp.")
+        with connect() as database:
+            database.execute("BEGIN IMMEDIATE")
+            ids = []
+            for note in payload["notes"]:
+                cursor = database.execute("INSERT INTO notes (title, content, pinned, archived, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    tuple(note[field] for field in ("title", "content", "pinned", "archived", "created_at", "updated_at", "deleted_at")))
+                replace_tags(database, cursor.lastrowid, normalise_tags(note["tags"]))
+                ids.append(cursor.lastrowid)
+        return jsonify(imported=len(ids), ids=ids), 201
 
     @app.get("/api/tags")
     def list_tags():

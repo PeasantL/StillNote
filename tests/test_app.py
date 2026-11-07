@@ -134,3 +134,62 @@ def test_permanent_deletion_requires_trash_and_current_revision(client):
     trashed = client.get(url + '?trash=1').get_json()
     assert client.delete(url + '/permanent', json={'revision': trashed['revision']}).status_code == 204
     assert client.get(url + '?trash=1').status_code == 404
+
+
+def test_json_roundtrip_preserves_metadata_and_imports_copies(client):
+    note = client.post('/api/notes', json={'title': '日本語', 'content': 'Keep\nall text', 'tags': ['diary']}).get_json()
+    url = f"/api/notes/{note['id']}"
+    client.patch(url, json={'pinned': True, 'archived': True})
+    client.delete(url)
+    backup = client.get('/export/notes.json').get_json()
+    imported = client.post('/api/import', json=backup)
+    assert imported.status_code == 201
+    assert imported.get_json()['ids'] != [note['id']]
+    copies = client.get('/api/notes?trash=1').get_json()
+    assert len(copies) == 2
+    for field in ('title', 'content', 'tags', 'pinned', 'archived', 'created_at', 'updated_at', 'deleted_at'):
+        assert copies[0][field] == copies[1][field]
+
+
+def test_invalid_import_is_atomic(client):
+    client.post('/api/notes', json={'content': 'keep'})
+    backup = client.get('/export/notes.json').get_json()
+    backup['notes'].append(dict(backup['notes'][0], updated_at='invalid'))
+    assert client.post('/api/import', json=backup).status_code == 400
+    assert len(client.get('/api/notes').get_json()) == 1
+    assert client.post('/api/import', json={'format': 'stillnote', 'version': True, 'notes': []}).status_code == 400
+
+
+def test_history_coalesces_and_restore_keeps_current_version(client):
+    note = client.post('/api/notes', json={'content': 'original', 'tags': ['first']}).get_json()
+    url = f"/api/notes/{note['id']}"
+    for content in ['second', 'third']:
+        current = client.patch(url, json={'content': content, 'tags': ['next']}).get_json()
+    entries = client.get(url + '/history').get_json()
+    assert len(entries) == 1
+    restore_url = url + f"/history/{entries[0]['id']}/restore"
+    assert client.post(restore_url, json={'revision': 1}).status_code == 409
+    restored = client.post(restore_url, json={'revision': current['revision']}).get_json()
+    assert restored['content'] == 'original'
+    assert restored['tags'] == ['first']
+    entries = client.get(url + '/history').get_json()
+    assert len(entries) == 2
+    assert client.get(url + f"/history/{entries[0]['id']}").get_json()['content'] == 'third'
+
+
+def test_history_retention_is_bounded(tmp_path):
+    import sqlite3
+    path = str(tmp_path / 'history.db')
+    client = create_app({'TESTING': True, 'DATABASE': path}).test_client()
+    note = client.post('/api/notes', json={}).get_json()
+    url = f"/api/notes/{note['id']}"
+    for index in range(25):
+        client.patch(url, json={'content': str(index)})
+        with sqlite3.connect(path) as database:
+            database.execute("UPDATE note_history SET saved_at = '2000-01-01T00:00:00+00:00'")
+    assert len(client.get(url + '/history').get_json()) == 20
+    client.delete(url)
+    trashed = client.get(url + '?trash=1').get_json()
+    client.delete(url + '/permanent', json={'revision': trashed['revision']})
+    with sqlite3.connect(path) as database:
+        assert database.execute('SELECT COUNT(*) FROM note_history').fetchone()[0] == 0

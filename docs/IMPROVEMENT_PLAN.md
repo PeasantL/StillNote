@@ -127,3 +127,9 @@ Five in-process Flask test-client trials per case, median elapsed time; syntheti
 Summary responses are approximately 91% smaller in this benchmark. Body-only saves also have a browser assertion that no full-library or tag refresh occurs. At 10,000 notes, a 4 MB summary still justifies pagination or incremental loading; this is unnecessary for the current small library and should be introduced with a real retrieval need. FTS remains evidence driven.
 
 Current delivery: phases 1–3 implemented, plus SQLite backup/restore from phase 4. Still planned: versioned portable JSON import/export, coalesced revision history, scheduled external backups, evidence-driven retrieval enhancements and CI/accessibility/platform follow-ups. Actual iPad hardware verification is still required before release. No deployment, live database mutation or analytics opt-in occurred during implementation.
+
+### Portable backups and note history — 8 November 2026
+
+Implemented version 1 JSON export and validated, atomic append-only import with fresh IDs (repeated imports deliberately create copies). Timestamps, tags, pin/archive state and trash round-trip. Import is limited to 16 MiB/10,000 notes; SQLite backup/restore handles larger libraries and also includes history. JSON backups intentionally contain current notes, not history or browser-only data.
+
+Implemented 20 checkpoints per note, capturing the previous version at most once per five-minute window. Explicit restores force a checkpoint of the current note, check its revision and restore as a new revision. History preview is plain text, details load on demand, and permanent note deletion cascades to its history. Database readiness now reads the notes table. Full suite: 39 passed, followed by focused browser/import/history/retention checks.
