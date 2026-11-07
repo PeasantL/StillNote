@@ -93,3 +93,44 @@ def test_migration_preserves_existing_note(tmp_path):
         assert note['content'] == 'Keep this text'
         assert note['pinned'] is True
         assert note['revision'] == 1
+
+
+def test_trash_restore_preserves_content_tags_and_state(client):
+    note = client.post('/api/notes', json={'title': 'Keep me', 'content': 'Exact text\n日本語', 'tags': ['personal']}).get_json()
+    url = f"/api/notes/{note['id']}"
+    original = client.patch(url, json={'pinned': True, 'archived': True}).get_json()
+    assert client.delete(url, json={'revision': original['revision']}).status_code == 204
+    assert client.get(url).status_code == 404
+    trash = client.get('/api/notes?trash=1').get_json()
+    assert len(trash) == 1
+    assert client.patch(url, json={'content': 'stale edit'}).status_code == 409
+    restored = client.post(url + '/restore', json={'revision': trash[0]['revision']}).get_json()
+    assert restored['deleted_at'] is None
+    for field in ('content', 'tags', 'pinned', 'archived', 'created_at', 'updated_at'):
+        assert restored[field] == original[field]
+    assert client.get('/api/notes?trash=1').get_json() == []
+    assert client.get('/api/notes?archived=1').get_json()[0]['id'] == note['id']
+
+
+def test_trash_is_excluded_from_tags_search_and_export(client):
+    import io
+    import zipfile
+    note = client.post('/api/notes', json={'title': 'Hidden', 'content': 'secret', 'tags': ['only-trash']}).get_json()
+    client.delete(f"/api/notes/{note['id']}")
+    assert client.get('/api/notes?q=secret').get_json() == []
+    assert client.get('/api/tags').get_json() == []
+    with zipfile.ZipFile(io.BytesIO(client.get('/export/notes.zip').data)) as archive:
+        assert archive.namelist() == []
+
+
+def test_permanent_deletion_requires_trash_and_current_revision(client):
+    note = client.post('/api/notes', json={'tags': ['orphan']}).get_json()
+    url = f"/api/notes/{note['id']}"
+    assert client.delete(url + '/permanent', json={'revision': note['revision']}).status_code == 409
+    assert client.delete(url, json={'revision': 999}).status_code == 409
+    client.delete(url)
+    assert client.delete(url + '/permanent', json={}).status_code == 400
+    assert client.delete(url + '/permanent', json={'revision': note['revision']}).status_code == 409
+    trashed = client.get(url + '?trash=1').get_json()
+    assert client.delete(url + '/permanent', json={'revision': trashed['revision']}).status_code == 204
+    assert client.get(url + '?trash=1').status_code == 404

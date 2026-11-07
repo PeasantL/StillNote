@@ -103,3 +103,10 @@ Resume with a review of this checkpoint, then phase 2 (opt-in private usage insi
 ### Private usage insights — 8 November 2026
 
 Implemented a native Usage dialog with explicit opt-in, daily counters retained for 90 local calendar days, stop/clear/export controls and a fixed event vocabulary. The collector accepts no event properties and performs no network requests. Counts are per browser and must be exported for later review. Storage errors do not interrupt note editing. Browser tests cover opt-in, rejection of unknown events, retention, export, reset and unavailable storage.
+
+
+### Recoverable actions and capture — 8 November 2026
+
+Implemented additive trash migration, a dedicated Trash view, read-only trashed notes, restoration preserving content/tags/pin/archive state, and explicit permanent deletion requiring a current revision. Normal lists, tag counts and Markdown exports omit trash. Stale clients cannot edit a trashed note. Added browser-local-date journal capture, contextual library headings and a visible Markdown export action that flushes pending edits first.
+
+Verification: **33 tests passed**, including exact restoration, stale-revision and permanent-deletion safeguards, export/tag/search exclusion, the browser trash/restore/journal flow and all earlier layout/recovery/privacy tests. No live data changed; deployment remains pending.

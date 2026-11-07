@@ -90,4 +90,16 @@ See [the improvement plan](docs/IMPROVEMENT_PLAN.md) for priorities, acceptance
 criteria and implementation status. Open **Usage** to opt into private daily feature counts. Counts stay in this
 browser for 90 days; use the same panel to stop, clear or export them. No note
 text, titles, tags, queries or identifiers are collected or uploaded. Recoverable
-trash remains planned.
+trash is available from the sidebar.
+
+## Trash and quick capture
+
+**Move to Trash** keeps the complete note. Open **Trash**, choose a note, and use
+**Restore from Trash** to recover it with its previous tags and pin/archive state.
+Trashed notes are read-only and excluded from normal search and Markdown export.
+**Delete permanently** is available only in Trash and asks for confirmation. Trash
+is never purged automatically.
+
+**New journal entry** creates an ordinary note titled with today's local date and
+the Diary tag. Each click creates a new entry. **Export Markdown** downloads all
+non-trashed notes after saving pending edits.

@@ -8,7 +8,7 @@ const DRAFT_PREFIX = 'stillnote-draft-';
 const LAST_NOTE_KEY = 'stillnote-last-note';
 const el = Object.fromEntries([
   'notesList', 'emptyList', 'emptyEditor', 'editor', 'noteTitle', 'noteTags', 'noteContent',
-  'saveStatus', 'saveNow', 'draftNotice', 'recoverDraft', 'discardDraft', 'pinNote', 'archiveNote', 'deleteNote', 'newNote', 'search', 'tagList',
+  'newJournal', 'exportNotes', 'restoreTrash', 'permanentDelete', 'saveStatus', 'saveNow', 'draftNotice', 'recoverDraft', 'discardDraft', 'pinNote', 'archiveNote', 'deleteNote', 'newNote', 'search', 'tagList',
   'tagChips', 'editTags', 'tagEditor', 'doneTags', 'emptyNewNote', 'emptyEditorTitle', 'emptyEditorDescription', 'themeButton', 'openSidebar', 'closeSidebar', 'sidebarScrim', 'backToList', 'messageToast', 'messageText'
 ].map(id => [id, document.getElementById(id)]));
 
@@ -79,6 +79,7 @@ function displayDate(value) {
 async function loadNotes() {
   const requestId = ++state.listRequest;
   const parameters = new URLSearchParams({ summary: '1' });
+  if (state.view === 'trash') parameters.set('trash', '1');
   if (state.view === 'archived') parameters.set('archived', '1');
   if (state.search) parameters.set('q', state.search);
   if (state.tag) parameters.set('tag', state.tag);
@@ -100,7 +101,7 @@ function renderNotes() {
     </button>`;
   }).join('');
   el.emptyList.classList.toggle('d-none', state.notes.length > 0);
-  el.emptyList.textContent = state.search ? 'No matching notes.' : state.view === 'pinned' ? 'No pinned notes yet.' : state.view === 'archived' ? 'No archived notes.' : 'No notes here yet.';
+  el.emptyList.textContent = state.search ? 'No matching notes.' : state.view === 'pinned' ? 'No pinned notes yet.' : state.view === 'trash' ? 'Trash is empty.' : state.view === 'archived' ? 'No archived notes.' : 'No notes here yet.';
 }
 
 function renderTagChips() {
@@ -138,7 +139,7 @@ function showEditor(note) {
   el.noteTitle.value = note.title;
   el.noteContent.value = note.content;
   el.noteTags.value = note.tags.join(', ');
-  const draft = readDraft(note.id);
+  const draft = note.deleted_at ? null : readDraft(note.id);
   if (draft) {
     el.noteTitle.value = draft.title;
     el.noteContent.value = draft.content;
@@ -150,6 +151,10 @@ function showEditor(note) {
     el.draftNotice.classList.toggle('d-none', !state.conflict);
   }
   closeTagEditor();
+  lockEditor(false);
+  for (const button of [el.pinNote, el.archiveNote, el.deleteNote, el.saveNow, el.editTags]) button.classList.toggle('d-none', !!note.deleted_at);
+  for (const button of [el.restoreTrash, el.permanentDelete]) button.classList.toggle('d-none', !note.deleted_at);
+  if (note.deleted_at) el.saveStatus.textContent = 'In Trash — restore to edit';
   el.pinNote.setAttribute('aria-pressed', String(note.pinned));
   el.pinNote.textContent = note.pinned ? 'Unpin' : 'Pin';
   el.archiveNote.textContent = note.archived ? 'Restore' : 'Archive';
@@ -179,7 +184,7 @@ function keepDraft() {
 }
 
 function lockEditor(locked) {
-  [el.noteTitle, el.noteContent, el.noteTags].forEach(input => { input.readOnly = locked; });
+  [el.noteTitle, el.noteContent, el.noteTags].forEach(input => { input.readOnly = locked || !!state.selected?.deleted_at; });
 }
 
 async function navigate(action) {
@@ -193,7 +198,7 @@ async function navigate(action) {
 }
 
 async function selectNote(id) {
-  await navigate(async () => { showEditor(await api(`/api/notes/${id}`)); usage.record('note_open'); });
+  await navigate(async () => { showEditor(await api(`/api/notes/${id}${state.view === 'trash' ? '?trash=1' : ''}`)); usage.record('note_open'); });
 }
 
 async function restoreLastOpenedNote() {
@@ -203,7 +208,7 @@ async function restoreLastOpenedNote() {
   else { storage.remove(LAST_NOTE_KEY); showEmptyEditor(); }
 }
 
-async function createNote(initial = {}) {
+async function createNote(initial = {}, source = '') {
   await navigate(async () => {
     const note = await api('/api/notes', { method: 'POST', body: JSON.stringify(initial) });
     state.view = 'notes'; state.tag = ''; state.search = ''; el.search.value = '';
@@ -211,6 +216,7 @@ async function createNote(initial = {}) {
     await loadNotes();
     showEditor(note);
     usage.record('note_create');
+    if (source === 'journal') usage.record('journal');
     el.noteTitle.select();
   });
 }
@@ -227,7 +233,7 @@ function scheduleSave() {
 function updateListNote(note) {
   // Invalidate older responses which could put stale summaries back in the list.
   state.listRequest++;
-  const matches = note.archived === (state.view === 'archived')
+  const matches = (state.view === 'trash' ? !!note.deleted_at : !note.deleted_at && note.archived === (state.view === 'archived'))
     && (state.view !== 'pinned' || note.pinned)
     && (!state.tag || note.tags.some(tag => tag.toLowerCase() === state.tag.toLowerCase()))
     && (!state.search || `${note.title} ${note.content}`.toLowerCase().includes(state.search.toLowerCase()));
@@ -296,22 +302,23 @@ async function patchSelected(changes) {
   return success;
 }
 
-async function deleteSelected() {
-  if (!state.selected || !confirm(`Permanently delete “${state.selected.title}”?`)) return;
+async function changeTrash(action) {
+  if (!state.selected) return;
+  if (action === 'permanent' && !confirm(`Permanently delete “${state.selected.title}”? This cannot be undone.`)) return;
   await navigate(async () => {
-    await api(`/api/notes/${state.selected.id}`, { method: 'DELETE' });
+    const id = state.selected.id;
+    const suffix = action === 'trash' ? '' : `/${action}`;
+    await api(`/api/notes/${id}${suffix}`, {
+      method: action === 'restore' ? 'POST' : 'DELETE',
+      body: JSON.stringify({ revision: state.selected.revision })
+    });
+    if (action !== 'permanent') usage.record(action);
+    if (action === 'permanent') storage.remove(DRAFT_PREFIX + id);
     state.selected = null;
     storage.remove(LAST_NOTE_KEY);
-    state.view = 'notes'; state.tag = ''; state.search = ''; el.search.value = '';
-    setActiveView();
+    showEmptyEditor();
     await Promise.all([loadNotes(), loadTags()]);
-    const newestNote = state.notes.reduce((newest, note) => (
-      !newest || note.created_at > newest.created_at ? note : newest
-    ), null);
-    if (newestNote) showEditor(await api(`/api/notes/${newestNote.id}`));
-    else {
-      showEmptyEditor();
-    }
+    showMessage(action === 'trash' ? 'Moved to Trash. You can restore it from the sidebar.' : action === 'restore' ? 'Note restored to its previous library.' : 'Note permanently deleted.');
   });
 }
 
@@ -333,6 +340,7 @@ async function loadTags() {
 }
 
 function setActiveView() {
+  document.querySelector('.browser-title').textContent = state.tag ? `# ${state.tag}` : ({notes: 'Library', pinned: 'Pinned', archived: 'Archived', trash: 'Trash'}[state.view] || 'Library');
   document.querySelectorAll('[data-view]').forEach(button => button.classList.toggle('active', button.dataset.view === state.view && !state.tag));
 }
 
@@ -375,7 +383,9 @@ el.archiveNote.addEventListener('click', async () => {
   el.editor.classList.add('d-none'); el.emptyEditor.classList.remove('d-none');
   await loadNotes();
 });
-el.deleteNote.addEventListener('click', deleteSelected);
+el.deleteNote.addEventListener('click', () => changeTrash('trash'));
+el.restoreTrash.addEventListener('click', () => changeTrash('restore'));
+el.permanentDelete.addEventListener('click', () => changeTrash('permanent'));
 el.search.addEventListener('input', () => {
   clearTimeout(state.listTimer);
   state.listTimer = setTimeout(async () => { state.search = el.search.value.trim(); if (state.search) usage.record('search'); try { await loadNotes(); } catch (error) { showMessage(error.message); } }, 200);
@@ -461,3 +471,18 @@ Promise.all([loadNotes(), loadTags()])
   .then(restoreLastOpenedNote)
   .catch(error => showMessage(error.message))
   .finally(revealApp);
+
+el.newJournal.addEventListener('click', () => {
+  const today = new Date();
+  const date = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  closeSidebar();
+  createNote({ title: `Diary - ${date}`, tags: ['Diary'] }, 'journal');
+});
+el.exportNotes.addEventListener('click', () => navigate(async () => {
+  const response = await fetch('/export/notes.zip');
+  if (!response.ok) throw new Error('Export failed. Please try again.');
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement('a'); link.href = url; link.download = 'notes-export.zip'; link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  usage.record('export');
+}));

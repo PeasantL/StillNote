@@ -37,6 +37,9 @@
           <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v4H4zM5.5 9h13v11h-13z"/><path d="M9.5 13h5"/></svg></span>
           Archived
         </button>
+        <button class="nav-link text-start" data-view="trash">Trash</button>
+        <button class="nav-link text-start" id="newJournal">New journal entry</button>
+        <button class="nav-link text-start" id="exportNotes">Export Markdown</button>
       </nav>
       <div class="sidebar-heading px-3 mt-4 mb-2">Tags</div>
       <nav id="tagList" class="nav nav-pills flex-column px-2 gap-1"></nav>
@@ -88,7 +91,9 @@
             <ul class="dropdown-menu dropdown-menu-end">
               <li><button class="dropdown-item" id="archiveNote">Archive</button></li>
               <li><hr class="dropdown-divider"></li>
-              <li><button class="dropdown-item danger-button" id="deleteNote">Delete note</button></li>
+              <li><button class="dropdown-item danger-button" id="deleteNote">Move to Trash</button></li>
+              <li><button class="dropdown-item d-none" id="restoreTrash">Restore from Trash</button></li>
+              <li><button class="dropdown-item danger-button d-none" id="permanentDelete">Delete permanently</button></li>
             </ul>
           </div>
         </header>

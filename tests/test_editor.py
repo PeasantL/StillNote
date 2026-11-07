@@ -169,3 +169,23 @@ def test_usage_retention_and_storage_failure(editor):
     assert page.evaluate('usage.snapshot().days') == {}
     page.evaluate("() => { Storage.prototype.setItem = () => { throw new Error('quota'); }; }")
     assert page.evaluate("usage.record('save')") is False
+
+
+def test_trash_restore_and_journal_capture(editor):
+    page, client, first, _ = editor
+    page.locator('[aria-label="More note actions"]').click()
+    page.locator('#deleteNote').click()
+    page.wait_for_function('state.selected === null')
+    page.locator('[data-view="trash"]').click()
+    page.wait_for_function("state.view === 'trash' && state.notes.length === 1")
+    page.locator(f'[data-id="{first["id"]}"]').click()
+    page.wait_for_function("document.querySelector('#noteContent').readOnly")
+    assert page.locator('#noteContent').input_value() == 'First body'
+    page.locator('[aria-label="More note actions"]').click()
+    page.locator('#restoreTrash').click()
+    page.wait_for_function('state.selected === null && state.notes.length === 0')
+    assert client.get(f'/api/notes/{first["id"]}').get_json()['content'] == 'First body'
+    page.locator('#newJournal').click()
+    page.wait_for_function("document.querySelector('#noteTitle').value.startsWith('Diary - ')")
+    assert client.get('/api/notes').get_json()[0]['tags'] == ['Diary']
+    assert page.locator('#noteContent').get_attribute('readonly') is None

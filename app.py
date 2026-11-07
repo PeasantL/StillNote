@@ -70,6 +70,8 @@ def create_app(test_config=None):
             columns = {row["name"] for row in database.execute("PRAGMA table_info(notes)")}
             if "revision" not in columns:
                 database.execute("ALTER TABLE notes ADD COLUMN revision INTEGER NOT NULL DEFAULT 1")
+            if "deleted_at" not in columns:
+                database.execute("ALTER TABLE notes ADD COLUMN deleted_at TEXT")
             database.execute("CREATE INDEX IF NOT EXISTS note_tags_tag_idx ON note_tags(tag_id, note_id)")
 
     def note_as_dict(database, row):
@@ -87,9 +89,9 @@ def create_app(test_config=None):
         result["tags"] = [tag["name"] for tag in tags]
         return result
 
-    def get_note(database, note_id):
+    def get_note(database, note_id, include_deleted=False):
         row = database.execute("SELECT * FROM notes WHERE id = ?", (note_id,)).fetchone()
-        if row is None:
+        if row is None or (row["deleted_at"] and not include_deleted):
             abort(404)
         return row
 
@@ -177,13 +179,16 @@ def create_app(test_config=None):
         summary = request.args.get("summary") == "1"
         fields = "notes.*"
         if summary:
-            fields = "notes.id, notes.title, notes.pinned, notes.archived, notes.created_at, notes.updated_at, notes.revision, substr(notes.content, 1, 240) AS preview"
+            fields = "notes.id, notes.title, notes.pinned, notes.archived, notes.created_at, notes.updated_at, notes.revision, notes.deleted_at, substr(notes.content, 1, 240) AS preview"
         sql = f"SELECT DISTINCT {fields} FROM notes"
         parameters = []
         if tag:
             sql += " JOIN note_tags ON note_tags.note_id = notes.id JOIN tags ON tags.id = note_tags.tag_id"
-        sql += " WHERE notes.archived = ?"
-        parameters.append(archived)
+        if request.args.get("trash") == "1":
+            sql += " WHERE notes.deleted_at IS NOT NULL"
+        else:
+            sql += " WHERE notes.deleted_at IS NULL AND notes.archived = ?"
+            parameters.append(archived)
         if search:
             sql += " AND (notes.title LIKE ? ESCAPE '\\' OR notes.content LIKE ? ESCAPE '\\')"
             escaped = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
@@ -226,7 +231,7 @@ def create_app(test_config=None):
     @app.get("/api/notes/<int:note_id>")
     def read_note(note_id):
         with connect() as database:
-            return jsonify(note_as_dict(database, get_note(database, note_id)))
+            return jsonify(note_as_dict(database, get_note(database, note_id, request.args.get("trash") == "1")))
 
     @app.patch("/api/notes/<int:note_id>")
     def update_note(note_id):
@@ -237,7 +242,9 @@ def create_app(test_config=None):
             return {"error": "No supported fields were provided."}, 400
         with connect() as database:
             database.execute("BEGIN IMMEDIATE")
-            current = get_note(database, note_id)
+            current = get_note(database, note_id, include_deleted=True)
+            if current["deleted_at"]:
+                return {"error": "This note is in Trash. Recover your draft as a new note or restore the saved note first."}, 409
             if "revision" in payload and payload["revision"] != current["revision"]:
                 return {"error": "This note changed elsewhere. Your edits are kept locally; reopen the note to review them.", "current": note_as_dict(database, current)}, 409
             title = str(payload.get("title", current["title"])).strip()[:200] or "Untitled note"
@@ -252,11 +259,48 @@ def create_app(test_config=None):
                 replace_tags(database, note_id, normalise_tags(payload["tags"]))
             return jsonify(note_as_dict(database, get_note(database, note_id)))
 
+    def check_revision(payload, current, required=False):
+        if required and "revision" not in payload:
+            abort(400, description="A revision is required.")
+        if "revision" in payload and payload["revision"] != current["revision"]:
+            abort(409, description="This note changed elsewhere. Reopen it before trying again.")
+
     @app.delete("/api/notes/<int:note_id>")
     def delete_note(note_id):
+        payload = payload_object() if request.data else {}
+        validate_fields(payload)
         with connect() as database:
-            get_note(database, note_id)
+            database.execute("BEGIN IMMEDIATE")
+            current = get_note(database, note_id)
+            check_revision(payload, current)
+            database.execute("UPDATE notes SET deleted_at = ?, revision = revision + 1 WHERE id = ?", (utc_now(), note_id))
+        return Response(status=204)
+
+    @app.post("/api/notes/<int:note_id>/restore")
+    def restore_note(note_id):
+        payload = payload_object()
+        validate_fields(payload)
+        with connect() as database:
+            database.execute("BEGIN IMMEDIATE")
+            current = get_note(database, note_id, include_deleted=True)
+            check_revision(payload, current, required=True)
+            if not current["deleted_at"]:
+                abort(409, description="This note is not in Trash.")
+            database.execute("UPDATE notes SET deleted_at = NULL, revision = revision + 1 WHERE id = ?", (note_id,))
+            return jsonify(note_as_dict(database, get_note(database, note_id)))
+
+    @app.delete("/api/notes/<int:note_id>/permanent")
+    def permanently_delete_note(note_id):
+        payload = payload_object()
+        validate_fields(payload)
+        with connect() as database:
+            database.execute("BEGIN IMMEDIATE")
+            current = get_note(database, note_id, include_deleted=True)
+            check_revision(payload, current, required=True)
+            if not current["deleted_at"]:
+                abort(409, description="Move this note to Trash before deleting it permanently.")
             database.execute("DELETE FROM notes WHERE id = ?", (note_id,))
+            database.execute("DELETE FROM tags WHERE id NOT IN (SELECT tag_id FROM note_tags)")
         return Response(status=204)
 
     @app.get("/api/tags")
@@ -267,7 +311,7 @@ def create_app(test_config=None):
                 SELECT tags.name, COUNT(note_tags.note_id) AS note_count
                 FROM tags JOIN note_tags ON note_tags.tag_id = tags.id
                 JOIN notes ON notes.id = note_tags.note_id
-                WHERE notes.archived = 0
+                WHERE notes.archived = 0 AND notes.deleted_at IS NULL
                 GROUP BY tags.id ORDER BY tags.name COLLATE NOCASE
                 """
             ).fetchall()
@@ -278,7 +322,7 @@ def create_app(test_config=None):
         memory_file = io.BytesIO()
         used_names = set()
         with connect() as database, zipfile.ZipFile(memory_file, "w", zipfile.ZIP_DEFLATED) as archive:
-            rows = database.execute("SELECT * FROM notes ORDER BY updated_at DESC").fetchall()
+            rows = database.execute("SELECT * FROM notes WHERE deleted_at IS NULL ORDER BY updated_at DESC").fetchall()
             for row in rows:
                 base = "".join(character for character in row["title"] if character.isalnum() or character in " -_").strip() or "untitled-note"
                 filename = f"{base[:80]}.md"
