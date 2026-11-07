@@ -6,3 +6,11 @@ __pycache__
 instance
 tests
 
+.env
+data
+*.db
+*.db-shm
+*.db-wal
+.agents
+.codex
+.aws
