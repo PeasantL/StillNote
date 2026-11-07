@@ -133,3 +133,39 @@ def test_storage_failure_does_not_prevent_editing(editor):
     page.locator('#saveNow').click()
     page.wait_for_function("document.querySelector('#saveStatus').textContent === 'Saved'")
     assert client.get(f'/api/notes/{first["id"]}').get_json()['content'] == 'Still saves to server'
+
+
+def test_usage_is_opt_in_and_counts_no_note_data(editor):
+    page, _, _, _ = editor
+    assert page.evaluate("localStorage.getItem('stillnote-usage-v1')") is None
+    assert page.evaluate("usage.record('note_create')") is False
+    page.locator('#openUsage').click()
+    page.locator('#usageEnabled').check()
+    page.locator('#closeUsage').click()
+    page.locator('#newNote').click()
+    page.wait_for_function("document.querySelector('#noteTitle').value === 'Untitled note'")
+    assert page.evaluate("usage.record('a private search term')") is False
+    snapshot = page.evaluate('usage.snapshot()')
+    assert snapshot['enabled'] is True
+    assert sum(day.get('note_create', 0) for day in snapshot['days'].values()) == 1
+    assert 'Untitled' not in str(snapshot)
+    page.locator('#openUsage').click()
+    with page.expect_download() as download:
+        page.locator('#exportUsage').click()
+    assert download.value.suggested_filename == 'stillnote-usage.json'
+    page.locator('#usageEnabled').uncheck()
+    assert page.evaluate("usage.record('save')") is False
+    page.locator('#clearUsage').click()
+    assert page.evaluate('usage.snapshot().days') == {}
+
+
+def test_usage_retention_and_storage_failure(editor):
+    page, _, _, _ = editor
+    page.evaluate("""() => {
+      localStorage.setItem('stillnote-usage-v1', JSON.stringify({ enabled: true, days: {
+        '2000-01-01': {save: 9}, '2999-01-01': {save: 9}
+      }}));
+    }""")
+    assert page.evaluate('usage.snapshot().days') == {}
+    page.evaluate("() => { Storage.prototype.setItem = () => { throw new Error('quota'); }; }")
+    assert page.evaluate("usage.record('save')") is False

@@ -87,5 +87,7 @@ Markdown ZIP export is available at `/export/notes.zip`; it is not a full databa
 backup and does not preserve tags or note state.
 
 See [the improvement plan](docs/IMPROVEMENT_PLAN.md) for priorities, acceptance
-criteria and implementation status. Usage tracking and recoverable trash remain
-planned; no analytics are currently collected.
+criteria and implementation status. Open **Usage** to opt into private daily feature counts. Counts stay in this
+browser for 90 days; use the same panel to stop, clear or export them. No note
+text, titles, tags, queries or identifiers are collected or uploaded. Recoverable
+trash remains planned.

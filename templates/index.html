@@ -40,7 +40,8 @@
       </nav>
       <div class="sidebar-heading px-3 mt-4 mb-2">Tags</div>
       <nav id="tagList" class="nav nav-pills flex-column px-2 gap-1"></nav>
-      <div class="sidebar-footer mt-auto d-flex">
+      <div class="sidebar-footer mt-auto d-flex flex-wrap gap-1">
+        <button class="btn quiet-button btn-sm" id="openUsage">Usage</button>
         <button class="btn glass-button theme-toggle" id="themeButton" aria-label="Use light theme" title="Use light theme">
           <svg class="theme-icon theme-icon-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M18.7 5.3l-1.4 1.4M6.7 17.3l-1.4 1.4"/></svg>
           <svg class="theme-icon theme-icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 15.2A8.5 8.5 0 0 1 8.8 4a8.5 8.5 0 1 0 11.2 11.2Z"/></svg>
@@ -116,12 +117,27 @@
     </main>
   </div>
 
+  <dialog id="usageDialog" aria-labelledby="usageTitle">
+    <div class="d-flex justify-content-between align-items-center gap-3">
+      <h2 id="usageTitle" class="h5">Private usage insights</h2>
+      <button class="btn quiet-button" id="closeUsage" aria-label="Close usage insights">Close</button>
+    </div>
+    <p>Optional daily feature counts, kept only in this browser for 90 days. No note text,
+      titles, tags, search terms or identifiers are collected or uploaded.</p>
+    <label class="d-flex gap-2 mb-3"><input type="checkbox" id="usageEnabled"> Count my feature usage in this browser</label>
+    <p id="usageSummary" role="status"></p>
+    <table class="table"><caption>Feature actions in the last 90 days</caption><thead><tr><th>Feature</th><th>Count</th></tr></thead><tbody id="usageCounts"></tbody></table>
+    <div class="d-flex gap-2"><button class="btn glass-button" id="exportUsage">Export counts</button><button class="btn glass-button" id="clearUsage">Clear counts</button></div>
+    <p class="small mt-3 mb-0">Counts belong to this browser and disappear if its data is cleared.
+      Draft recovery is separate and stores pending note text. Export counts to share them for a future review.</p>
+  </dialog>
   <div class="toast-container position-fixed bottom-0 end-0 p-3">
     <div id="messageToast" class="toast" role="status" aria-live="polite">
       <div class="toast-body" id="messageText"></div>
     </div>
   </div>
   <script src="{{ url_for('static', filename='vendor/bootstrap.bundle.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='usage.js') }}"></script>
   <script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
 </html>

@@ -193,7 +193,7 @@ async function navigate(action) {
 }
 
 async function selectNote(id) {
-  await navigate(async () => showEditor(await api(`/api/notes/${id}`)));
+  await navigate(async () => { showEditor(await api(`/api/notes/${id}`)); usage.record('note_open'); });
 }
 
 async function restoreLastOpenedNote() {
@@ -210,6 +210,7 @@ async function createNote(initial = {}) {
     setActiveView();
     await loadNotes();
     showEditor(note);
+    usage.record('note_create');
     el.noteTitle.select();
   });
 }
@@ -256,6 +257,7 @@ async function saveNote() {
         const updated = await api(`/api/notes/${id}`, {
           method: 'PATCH', body: JSON.stringify({ ...snapshot, revision: state.selected.revision })
         });
+        usage.record('save');
         state.selected = updated;
         state.dirty = state.editVersion !== version;
         if (state.dirty) keepDraft();
@@ -266,6 +268,7 @@ async function saveNote() {
       el.saveStatus.textContent = 'Saved';
       return true;
     } catch (error) {
+      usage.record(error.status === 409 ? 'save_conflict' : 'save_failure');
       state.conflict = error.status === 409;
       el.draftNotice.classList.toggle('d-none', !state.conflict);
       el.saveStatus.textContent = state.conflict ? 'Changed elsewhere — draft kept' : 'Save failed — retry with Save now';
@@ -286,6 +289,8 @@ async function patchSelected(changes) {
     showEditor(updated);
     updateListNote(updated);
     await loadTags();
+    if ('pinned' in changes) usage.record('pin');
+    if ('archived' in changes) usage.record('archive');
     success = true;
   });
   return success;
@@ -373,7 +378,7 @@ el.archiveNote.addEventListener('click', async () => {
 el.deleteNote.addEventListener('click', deleteSelected);
 el.search.addEventListener('input', () => {
   clearTimeout(state.listTimer);
-  state.listTimer = setTimeout(async () => { state.search = el.search.value.trim(); try { await loadNotes(); } catch (error) { showMessage(error.message); } }, 200);
+  state.listTimer = setTimeout(async () => { state.search = el.search.value.trim(); if (state.search) usage.record('search'); try { await loadNotes(); } catch (error) { showMessage(error.message); } }, 200);
 });
 document.querySelectorAll('[data-view]').forEach(button => button.addEventListener('click', async () => {
   await navigate(async () => {
@@ -389,7 +394,7 @@ el.tagList.addEventListener('click', async event => {
     await Promise.all([loadNotes(), loadTags()]);
   });
 });
-el.themeButton.addEventListener('click', () => applyTheme(document.documentElement.dataset.bsTheme === 'dark' ? 'light' : 'dark'));
+el.themeButton.addEventListener('click', () => { applyTheme(document.documentElement.dataset.bsTheme === 'dark' ? 'light' : 'dark'); usage.record('theme'); });
 el.openSidebar.addEventListener('click', () => document.body.classList.add('sidebar-open'));
 el.closeSidebar.addEventListener('click', closeSidebar);
 el.sidebarScrim.addEventListener('click', closeSidebar);

@@ -99,3 +99,7 @@ Verification: **27 tests passed**, including the existing WebKit/iPad layout che
 Remaining before release: real iPad verification; broader stale-search and navigation-failure coverage; performance benchmarks on synthetic larger libraries. Revision checks are optional for older API clients, and pending drafts share storage between tabs, so this is not full offline synchronization. Permanent deletion still exists until phase 3. No analytics have been implemented or enabled. No personal note text or titles were added to the repository.
 
 Resume with a review of this checkpoint, then phase 2 (opt-in private usage insights), followed by recoverable trash and journal capture. Backups and restore remain the next data-safety milestone.
+
+### Private usage insights — 8 November 2026
+
+Implemented a native Usage dialog with explicit opt-in, daily counters retained for 90 local calendar days, stop/clear/export controls and a fixed event vocabulary. The collector accepts no event properties and performs no network requests. Counts are per browser and must be exported for later review. Storage errors do not interrupt note editing. Browser tests cover opt-in, rejection of unknown events, retention, export, reset and unavailable storage.
