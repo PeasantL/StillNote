@@ -27,7 +27,7 @@ Open <http://127.0.0.1:5000>.
 ## Test
 
 ```sh
-.venv/bin/pip install pytest
+.venv/bin/pip install -r requirements-dev.txt
 .venv/bin/python -m pytest
 ```
 
@@ -70,7 +70,7 @@ failure, the current editor stays open.
 
 Pending title, body and tags are also stored locally in this browser for recovery
 on reload. This recovery copy contains your note text; it is separate from any
-future usage analytics. Successful saves remove it. Browser storage may be
+usage counts. Successful saves remove it. Browser storage may be
 unavailable or cleared, so recovery drafts are not a backup. Avoid editing the
 same note offline in several tabs: local recovery storage is shared by this
 browser's tabs.
@@ -138,3 +138,84 @@ and keep a second copy on another disk or host. Schedule this command with your
 host's scheduler and verify restores periodically. A directory named `backups`
 inside the notes volume does not protect against loss of that volume. Never copy
 only the main database file while it is being written; use the backup command.
+
+## Portable JSON and history
+
+**Backup JSON** exports every current note, including Trash, tags, timestamps and
+pin/archive state. **Import JSON** validates the complete backup and imports new
+copies with fresh IDs. Existing notes stay in place; importing the same file
+again creates duplicates. Imports are atomic and limited to 16 MiB and 10,000
+notes. JSON backups omit history, local drafts and usage counts. Use SQLite
+backup/restore for larger libraries or to preserve history.
+
+Open **Note history** from a note's action menu to preview and restore older
+text. StillNote captures the previous version at most once every five minutes
+and keeps the latest 20 checkpoints per note. This is recovery history, not a
+record of every keystroke. Restoring requires the current revision and also saves
+a checkpoint of the version being replaced. Empty/new notes may have no history.
+Permanent deletion also removes the note's history.
+
+## Finding and organising notes
+
+The library loads 100 summaries at a time. **Load more notes** extends the list;
+search and tag filters always query the full library. Choose recently edited,
+recently created or title order. Pins stay first within each sort order. **Clear
+filters** removes the search and tag restriction within the selected view.
+
+The tag field suggests existing tags. **Edit** beside Tags renames a tag across
+all its notes, including archived and trashed notes. Choosing an existing name
+merges the tags. These changes create history checkpoints and invalidate stale
+editor revisions, so unsaved copies cannot silently reintroduce the previous tag.
+
+## Scheduled backups
+
+`scripts/backup.sh` supports Docker (default) and local installations. It publishes
+complete backups outside the notes volume, restricts file permissions and rotates
+only its own timestamped files after a successful backup (30-day default).
+
+```sh
+STILLNOTE_BACKUP_DIR=/path/to/external/storage scripts/backup.sh
+# Local installation:
+STILLNOTE_BACKUP_MODE=local STILLNOTE_PYTHON=.venv/bin/python STILLNOTE_BACKUP_DIR=/path/to/external/storage scripts/backup.sh
+```
+
+Use `STILLNOTE_DATABASE` for a different local source, `STILLNOTE_CONTAINER` for a
+different container name, and `STILLNOTE_BACKUP_RETENTION_DAYS` for retention.
+
+Optional user-systemd units are in `deploy/`. Review their checkout and backup
+paths before installation. They assume `~/StillNote`, Docker access, and backups
+in `~/Backups/StillNote`; choose a separate disk or replicated location when
+possible. From the checkout:
+
+```sh
+mkdir -p ~/.config/systemd/user
+cp deploy/stillnote-backup.service deploy/stillnote-backup.timer ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now stillnote-backup.timer
+systemctl --user start stillnote-backup.service
+journalctl --user -u stillnote-backup.service
+```
+
+The units are provided for installation; running the app does not enable them.
+A user timer requires the user's systemd manager to be running; use your host's
+normal service policy for backups while logged out. Keep and periodically verify
+a copy on another host or disk.
+
+## Platform and automated checks
+
+Home-screen metadata supports standalone launch where the browser offers it.
+The app requires a connection to save; it does not implement offline sync.
+Browser zoom remains enabled. Narrow navigation supports Escape, focus return,
+and contained Tab navigation, and scrolls when the keyboard reduces its height.
+
+Install `requirements-dev.txt`, then run `python -m playwright install --with-deps
+webkit` and `python -m pytest -q` for the full suite. GitHub Actions runs those
+checks on Python 3.12 and 3.13. The deployment image uses Python 3.13. These checks
+include browser editing, save failures, conflicts, history, import, privacy,
+backup recovery and simulated iPad keyboard layouts; actual iPad verification
+still requires the device.
+
+StillNote is designed for one trusted user. Keep its loopback binding and use your
+existing trusted access boundary. Authentication, per-user isolation, shared
+editing and full offline synchronisation require a separate design before opening
+it to other users or untrusted networks.

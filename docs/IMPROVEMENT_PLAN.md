@@ -2,6 +2,8 @@
 
 Prepared 8 November 2026 (Australia/Perth). This is a living implementation plan.
 
+Current status: implementation and local verification are complete for the selected delivery scope. The execution record below contains results. Deployment, enabling a host timer, off-host backup replication and physical iPad validation are environment/device steps; they have not been performed on the live installation. Evidence-dependent feature ideas remain a future backlog.
+
 ## Evidence and product direction
 
 StillNote is a small, single-user, self-hosted Flask/SQLite app with a plain-JavaScript editor, local Bootstrap assets, and recent iPad landscape work. Keep that architecture: a frontend framework, vector database, cloud analytics, or background worker would add cost without evidence of benefit.
@@ -141,3 +143,16 @@ Implemented 100-note library batches with Load more, total counts, persistent so
 ### Final performance correction
 
 Bounded transfer initially still took 147.1 ms at 10,000 notes because the total-count query materialised every preview. Replaced it with a count of matching IDs and added a browse index. With the same five-trial synthetic benchmark, first-page medians are **2.7 ms / 41,303 bytes at 1,000 notes** and **3.6 ms / 41,503 bytes at 10,000 notes**. Each returns 100 summaries with an accurate total. This measures local database/serialization work, not end-to-end latency. Search still scans matching text because literal substring semantics are intentionally preserved.
+
+
+### Operations, accessibility and completion — 8 November 2026
+
+Delivered a scheduled-backup script with Docker/local modes, private atomic Docker archive publication, configurable retention and daily user-systemd templates. Failed backups preserve previous copies. Backup validation checks schema and foreign keys, rejects dangling destination symlinks, and writes standalone DELETE-journal archives so restores work from read-only storage. The end-to-end production-image drill created synthetic notes/history, exported/imported JSON, ran the actual Docker backup script and restored its archive from a read-only mount into a fresh database.
+
+Added home-screen manifest/metadata, pinch zoom, editor focus indicators, scrollable short-height navigation, inert closed mobile navigation, contained Tab handling, Escape dismissal and focus return. CI runs the full WebKit/Python suite on Python 3.12 and 3.13. Database files, credentials and local agent configuration are excluded from Docker build context. No new runtime dependencies or external tracking services were introduced.
+
+Final verification: **50 tests passed** in the Python 3.12/WebKit environment; **30 API/backup tests passed on Python 3.13**, with an additional five-test backup rerun and a successful read-only archive restore after the final WAL portability fix. Docker production image builds and smoke checks passed. Shell syntax and `git diff --check` passed. CI itself will execute on a later push; no push was requested. Temporary test containers are removed after verification. Live notes, running service, host timer configuration and browser opt-in were untouched.
+
+Delivered scope: reliable editing and recovery; local private usage controls; trash/journal capture; native and portable backups; bounded history; efficient paged retrieval and tag organisation; deployment-ready scheduler support; home-screen/keyboard improvements; automated regression checks. Conditional FTS, rich Markdown rendering, structured journaling, multi-user authentication, full offline sync, and a broad CSS redesign remain deliberate future options. They require usage evidence or a separate product/deployment requirement and are not necessary to ship this increment.
+
+Before deploying: take an external database backup, rebuild/restart the app, verify `/health`, notes and Trash, then perform the real iPad keyboard check. Install the reviewed timer only after choosing backup storage outside the notes volume; arrange off-host replication separately. Actual device behaviour and external backup durability cannot be established by local browser/database tests.
