@@ -189,3 +189,25 @@ def test_trash_restore_and_journal_capture(editor):
     page.wait_for_function("document.querySelector('#noteTitle').value.startsWith('Diary - ')")
     assert client.get('/api/notes').get_json()[0]['tags'] == ['Diary']
     assert page.locator('#noteContent').get_attribute('readonly') is None
+
+
+def test_search_ignores_response_from_older_query(editor):
+    page, _, _, second = editor
+    held = []
+
+    def delay_first_search(route):
+        if 'q=First' in route.request.url:
+            held.append((route, route.fetch()))
+        else:
+            route.continue_()
+
+    page.route('**/api/notes?**', delay_first_search)
+    page.locator('#search').fill('First')
+    page.wait_for_function("state.search === 'First'")
+    page.locator('#search').fill('Second')
+    page.wait_for_function("state.search === 'Second' && state.notes.length === 1 && state.notes[0].title === 'Second'")
+    route, response = held[0]
+    with page.expect_response(lambda response: 'q=First' in response.url):
+        route.fulfill(response=response)
+    page.evaluate('() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))')
+    assert page.locator('#notesList [data-id]').get_attribute('data-id') == str(second['id'])
